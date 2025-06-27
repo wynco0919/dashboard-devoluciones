@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Control de Devoluciones</title>
+    <title>Tablero de Control de Devoluciones (V22 - CDN)</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -34,11 +34,12 @@
 
 <div class="dashboard-container">
     <div class="header">
-        <img id="company-logo" src="https://i.ibb.co/pBzmhVmv/logo.png" alt="Logo de la Empresa">
+        <!-- ===== REEMPLAZA LA URL DE ABAJO CON EL ENLACE DIRECTO DE TU LOGO ===== -->
+        <img id="company-logo" src="https://i.ibb.co/6yZ0c3Z/wynco.png" alt="Logo de la Empresa">
         <h1>Dashboard de Control de Devoluciones</h1>
     </div>
 
-    <div id="loader" class="loader">Cargando datos...</div>
+    <div id="loader" class="loader">Cargando datos del tablero...</div>
     
     <div id="dashboard-content" class="hidden">
         <div class="controls-section">
@@ -68,8 +69,8 @@
     async function loadAllData() {
         try {
             const [devolucionesResult, despachosResult] = await Promise.all([
-                fetchAndParse('https://raw.githubusercontent.com/wynco0919/Dashboard-Devoluciones/main/devoluciones.csv'),
-                fetchAndParse('https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/refs/heads/main/despachos.csv')
+                fetchAndParse('https://cdn.jsdelivr.net/gh/wynco0919/Dashboard-Devoluciones/devoluciones.csv'),
+                fetchAndParse('https://cdn.jsdelivr.net/gh/wynco0919/Dashboard-Devoluciones/despachos.csv')
             ]);
             
             processDevoluciones(devolucionesResult);
@@ -81,11 +82,11 @@
                 createMonthButtons();
                 resetAll();
             } else {
-                 document.getElementById('loader').textContent = "Error al procesar los datos. Verifique que los archivos en GitHub tengan el formato correcto.";
+                 document.getElementById('loader').textContent = "Error al procesar los datos. Verifique que los archivos en GitHub tengan el formato y contenido correctos.";
             }
 
         } catch (error) {
-            document.getElementById('loader').textContent = `Error al cargar los archivos: ${error.message}`;
+            document.getElementById('loader').textContent = `Error al cargar los archivos desde GitHub. Causa: ${error.message}`;
             console.error("Error de carga:", error);
         }
     }
@@ -97,25 +98,12 @@
                 header: true,
                 dynamicTyping: true,
                 skipEmptyLines: 'greedy',
-                delimitersToGuess: [',', ';', '\t'],
-                transformHeader: normalizeHeader,
                 complete: resolve,
                 error: reject
             });
         });
     }
     
-    function processDevoluciones(parsedResult) {
-        // ... (resto de la función igual a v18)
-    }
-
-    function processDespachos(parsedResult) {
-        // ... (resto de la función igual a v18)
-    }
-    
-    // ... (El resto de las funciones: createMonthButtons, filterByMonth, applyCrossFilter, applyAllFilters, resetAll, updateKPIs, drawMonthlyTrendChart, drawDashboard, aggregateData se mantienen exactamente igual que en la v18)
-    // Se copian aquí para que el código sea completo.
-
     function processDevoluciones(parsedResult) {
         const data = parsedResult.data;
         const meta = parsedResult.meta;
@@ -168,6 +156,16 @@
         }).filter(d => d.mes >= 1 && d.mes <= 12);
     }
 
+    function createMonthButtons() { /* ... código sin cambios ... */ }
+    function filterByMonth(monthIndex) { /* ... código sin cambios ... */ }
+    function applyCrossFilter(key, value) { /* ... código sin cambios ... */ }
+    function resetAll() { /* ... código sin cambios ... */ }
+    function updateKPIs(data) { /* ... código sin cambios ... */ }
+    function drawMonthlyTrendChart() { /* ... código sin cambios ... */ }
+    function drawDashboard(data) { /* ... código sin cambios ... */ }
+    function aggregateData(data, key) { /* ... código sin cambios ... */ }
+    
+    // Todas las funciones auxiliares se copian aquí para completitud
     function createMonthButtons() {
         const container = document.getElementById('month-buttons');
         container.innerHTML = '';
@@ -178,7 +176,23 @@
             container.appendChild(button);
         });
     }
-
+    function applyAllFilters() {
+        let data = fullCleanedData;
+        if (activeMonth !== 0) { data = data.filter(d => d.mes === activeMonth); }
+        if (activeFilter.key) {
+            data = data.filter(d => d[activeFilter.key] && d[activeFilter.key].toUpperCase() === activeFilter.value.toUpperCase());
+            document.getElementById('current-filter').innerHTML = `<strong>Filtro:</strong> ${activeFilter.key.charAt(0).toUpperCase() + activeFilter.key.slice(1)} = <i>${activeFilter.value}</i>`;
+        } else {
+            const monthName = activeMonth === 0 ? 'General' : months[activeMonth];
+            document.getElementById('current-filter').innerHTML = `<strong>Vista:</strong> ${monthName}`;
+        }
+        document.querySelectorAll('#month-buttons button').forEach((btn, index) => btn.classList.toggle('active', index === activeMonth));
+        currentFilteredData = data;
+        drawDashboard(currentFilteredData.filter(d => d.cajas_devueltas > 0));
+        updateKPIs(currentFilteredData);
+        drawMonthlyTrendChart();
+    }
+    function resetAll() { activeMonth = 0; activeFilter = {}; applyAllFilters(); }
     function updateKPIs(data) {
         const kpiContainer = document.querySelector('.kpi-container');
         kpiContainer.innerHTML = `<div class="kpi-box"><div id="kpi-total-cajas" class="value">0</div><div class="label">Total Cajas Devueltas</div></div> <div class="kpi-box"><div id="kpi-pct-devolucion" class="value">-</div><div class="label">% Devolución (Mes Sel.)</div></div> <div class="kpi-box"><div id="kpi-total-docs" class="value">0</div><div class="label">Total Documentos</div></div> <div class="kpi-box"><div id="kpi-dev-fisica" class="value">0</div><div class="label">Docs. Dev. Física</div></div> <div class="kpi-box"><div id="kpi-dev-financiera" class="value">0</div><div class="label">Docs. Dev. Financiera</div></div>`;
@@ -197,9 +211,8 @@
         }
         const pctDevolucion = (cajasDespachadas > 0) ? (totalCajas / cajasDespachadas) * 100 : 0;
         const pctElement = document.getElementById('kpi-pct-devolucion');
-        pctElement.textContent = (activeMonth !== 0 && cajasDespachadas > 0) ? `${pctDevolucion.toFixed(2)}%` : (activeMonth !== 0 ? '0.00%' : '-');
+        pctElement.textContent = (activeMonth !== 0 && cajasDespachadas > 0) ? `${pctDevolucion.toFixed(2)}%` : (activeMonth !== 0 ? 'N/A' : '-');
     }
-
     function drawMonthlyTrendChart() {
         const monthlyDevoluciones = {};
         fullCleanedData.forEach(d => {
@@ -219,7 +232,6 @@
         const layout = { title: '<b>% de Devolución Mensual vs Despacho</b>', xaxis: { title: 'Mes' }, yaxis: { title: '% Devolución', ticksuffix: '%' }, margin: { t: 80, r: 20, b: 50, l: 50 }, paper_bgcolor: 'white', plot_bgcolor: 'white' };
         Plotly.newPlot('chart-monthly-trend', data, layout);
     }
-    
     function drawDashboard(data) {
         const responsableAgg = aggregateData(data, 'responsable');
         const motivoAgg = aggregateData(data, 'motivo');
@@ -228,12 +240,11 @@
         const clienteAgg = aggregateData(data, 'cliente');
         const commonLayout = { margin: { l: 200, r: 20, t: 60, b: 70 }, paper_bgcolor: 'white', plot_bgcolor: 'white', yaxis: { autorange: 'reversed' }, height: 450, xaxis: { showgrid: true, gridcolor: '#e9e9e9' } };
         Plotly.react('chart-responsable', [{ x: Object.values(responsableAgg), y: Object.keys(responsableAgg), type: 'bar', orientation: 'h', text: Object.values(responsableAgg).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(23, 190, 207, 0.8)' } }], { ...commonLayout, title: '<b>Devoluciones por Responsable</b>' });
-        Plotly.react('chart-motivo', [{ x: Object.values(motivoAgg).slice(0, 15), y: Object.keys(motivoAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(motivoAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(214, 39, 40, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Motivos</b>' });
-        Plotly.react('chart-producto', [{ x: Object.values(productoAgg).slice(0, 15), y: Object.keys(productoAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(productoAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(44, 160, 44, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Productos</b>' });
-        Plotly.react('chart-zona', [{ x: Object.values(zonaAgg).slice(0, 15), y: Object.keys(zonaAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(zonaAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(255, 127, 14, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Zonas</b>' });
-        Plotly.react('chart-cliente', [{ x: Object.values(clienteAgg).slice(0, 15), y: Object.keys(clienteAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(clienteAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(148, 103, 189, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Clientes</b>' });
+        Plotly.react('chart-motivo', [{ x: Object.values(motivoAgg).slice(0, 15), y: Object.keys(motivoAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(motivoAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(214, 39, 40, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Motivos de Devolución</b>' });
+        Plotly.react('chart-producto', [{ x: Object.values(productoAgg).slice(0, 15), y: Object.keys(productoAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(productoAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(44, 160, 44, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Productos Devueltos</b>' });
+        Plotly.react('chart-zona', [{ x: Object.values(zonaAgg).slice(0, 15), y: Object.keys(zonaAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(zonaAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(255, 127, 14, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Zonas con Devoluciones</b>' });
+        Plotly.react('chart-cliente', [{ x: Object.values(clienteAgg).slice(0, 15), y: Object.keys(clienteAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(clienteAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(148, 103, 189, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Clientes con Devoluciones</b>' });
     }
-
     function aggregateData(data, key) {
         const aggregation = data.reduce((acc, curr) => {
             const keyValue = curr[key] || 'SIN DATOS';
