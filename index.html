@@ -68,8 +68,8 @@
     async function loadAllData() {
         try {
             const [devolucionesResult, despachosResult] = await Promise.all([
-                fetchAndParse('devoluciones.csv'),
-                fetchAndParse('despachos.csv')
+                fetchAndParse('https://raw.githubusercontent.com/wynco0919/Dashboard-Devoluciones/main/devoluciones.csv'),
+                fetchAndParse('https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/refs/heads/main/despachos.csv')
             ]);
             
             processDevoluciones(devolucionesResult);
