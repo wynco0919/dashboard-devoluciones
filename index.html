@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Control de Devoluciones (V26 - Final)</title>
+    <title>Tablero de Control de Devoluciones (V27 - Final)</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -68,6 +68,7 @@
 
     async function loadAllData() {
         try {
+            // --- URLs CORREGIDAS CON LA RAMA 'principal' ---
             const [devolucionesResult, despachosResult] = await Promise.all([
                 fetchAndParse('https://raw.githubusercontent.com/wynco0919/Dashboard-Devoluciones/principal/devoluciones.csv'),
                 fetchAndParse('https://raw.githubusercontent.com/wynco0919/Dashboard-Devoluciones/principal/despachos.csv')
@@ -80,10 +81,9 @@
         }
     }
     
-    // ... El resto del script es idéntico al anterior ...
-    // Se incluye completo para evitar errores de copiado
+    // El resto del script es idéntico al anterior...
     function fetchAndParse(url) { return new Promise((resolve, reject) => { Papa.parse(url, { download: true, header: true, dynamicTyping: true, skipEmptyLines: 'greedy', complete: resolve, error: reject }); }); }
-    function processData(devolucionesResult, despachosResult) { const statusMsg = document.getElementById('status-message'); try { processDevoluciones(devolucionesResult); processDespachos(despachosResult); if (fullCleanedData.length > 0 && despachosPorMes.length > 0) { document.getElementById('loader').classList.add('hidden'); document.getElementById('dashboard-content').classList.remove('hidden'); createMonthButtons(); resetAll(); } else { document.getElementById('loader').textContent = "Error al procesar los datos. Verifique que los archivos en GitHub tengan el formato y contenido correctos."; } } catch (e) { statusMsg.textContent = "Error crítico al procesar los datos. Revisa la consola (F12)."; console.error("Error detallado:", e); } }
+    function processData(devolucionesResult, despachosResult) { const statusMsg = document.getElementById('status-message'); try { processDevoluciones(devolucionesResult); processDespachos(despachosResult); if (fullCleanedData.length > 0 && despachosPorMes.length > 0) { document.getElementById('loader').classList.add('hidden'); document.getElementById('dashboard-content').classList.remove('hidden'); createMonthButtons(); resetAll(); } else { document.getElementById('loader').textContent = "Error al procesar datos. Verifique archivos en GitHub."; } } catch (e) { statusMsg.textContent = "Error crítico al procesar los datos. Revisa la consola (F12)."; console.error("Error detallado:", e); } }
     function processDevoluciones(parsedResult) { const data = parsedResult.data; const meta = parsedResult.meta; const headers = meta.fields.map(normalizeHeader); const requiredCols = ['cajas_devueltas', 'responsable', 'motivo', 'producto', 'zona', 'mes', 'factura_nota', 'tipo_de_devolucion', 'cliente']; for (const col of requiredCols) { if (!headers.includes(col)) { throw new Error(`Falta la columna '${col}' en devoluciones.csv`); } } fullCleanedData = data.map(row => { if (!row || typeof row !== 'object' || Object.keys(row).length < 2) return null; const normalizedRow = {}; meta.fields.forEach(field => { const normalizedKey = normalizeHeader(field); normalizedRow[normalizedKey] = row[field]; }); const cleanNumber = (val) => parseInt(String(val || '0').replace(/[.,]/g, ''), 10) || 0; return { cajas_devueltas: cleanNumber(normalizedRow.cajas_devueltas), responsable: String(normalizedRow.responsable || 'S/D').trim().toUpperCase(), motivo: String(normalizedRow.motivo || 'S/D').trim().toUpperCase(), producto: String(normalizedRow.producto || 'S/D').trim(), zona: String(normalizedRow.zona || 'S/D').trim().toUpperCase(), cliente: String(normalizedRow.cliente || 'S/D').trim(), mes: parseInt(normalizedRow.mes, 10) || 0, factura_nota: String(normalizedRow.factura_nota || '').trim(), tipo_de_devolucion: String(normalizedRow.tipo_de_devolucion || 'S/D').trim().toUpperCase(), n_control: normalizedRow.n_control }; }).filter(d => d !== null); }
     function processDespachos(parsedResult) { const data = parsedResult.data; const meta = parsedResult.meta; const headers = meta.fields.map(normalizeHeader); const requiredCols = ['mes', 'cajas_despachadas']; for (const col of requiredCols) { if (!headers.includes(col)) { throw new Error(`Falta la columna '${col}' en despachos.csv`); } } despachosPorMes = data.map(row => { const normalizedRow = {}; meta.fields.forEach(field => { const normalizedKey = normalizeHeader(field); normalizedRow[normalizedKey] = row[field]; }); return { mes: parseInt(normalizedRow.mes, 10) || 0, cajas_despachadas: parseInt(String(normalizedRow.cajas_despachadas || '0').replace(/[.,]/g, ''), 10) || 0 }; }).filter(d => d.mes >= 1 && d.mes <= 12); }
     function createMonthButtons() { const container = document.getElementById('month-buttons'); container.innerHTML = ''; months.forEach((month, index) => { const button = document.createElement('button'); button.textContent = month; button.onclick = () => filterByMonth(index); container.appendChild(button); }); }
