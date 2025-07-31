@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Control de Devoluciones (V24 - Final)</title>
+    <title>Tablero de Control de Devoluciones (V25 - Final)</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -20,6 +20,7 @@
         .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; }
         .kpi-box { background-color: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
         .kpi-box .value { font-size: 2.2em; font-weight: bold; color: #005a9e; }
+        #kpi-pct-devolucion.high { color: #d9534f; }
         .kpi-box .label { font-size: 0.9em; color: #666; margin-top: 5px; }
         .chart-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(48%, 1fr)); gap: 20px; }
         .chart-box { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); min-height: 450px; }
@@ -27,14 +28,17 @@
         #reset-button { background-color: #d9534f; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .hidden { display: none; }
         .loader { text-align: center; padding: 50px; font-size: 1.2em; font-weight: bold; color: #005a9e;}
+        .recommendations-section { background-color: #fff; border-left: 5px solid #3498db; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .recommendations-section h2 { margin-top: 0; color: #2c3e50; }
+        .recommendations-section ul { padding-left: 20px; margin: 0; }
+        .recommendations-section li { margin-bottom: 12px; line-height: 1.5; }
     </style>
 </head>
 <body>
 
 <div class="dashboard-container">
     <div class="header">
-        <!-- ===== REEMPLAZA LA URL DE ABAJO CON EL ENLACE DIRECTO DE TU LOGO ===== -->
-        <img id="company-logo" src="https://i.ibb.co/pBzmhVmv/logo.png"Logo de la Empresa">
+        <img id="company-logo" src="https://i.ibb.co/6yZ0c3Z/wynco.png" alt="Logo de la Empresa">
         <h1>Dashboard de Control de Devoluciones</h1>
     </div>
 
@@ -46,6 +50,10 @@
         </div>
         <div class="kpi-container"></div>
         <div class="filter-info" style="margin-top: 20px;"><span id="current-filter"></span><button id="reset-button" onclick="resetAll()">Restablecer Filtros</button></div>
+        <div class="recommendations-section" style="margin-top:20px;">
+            <h2 >Conclusiones y Acciones Recomendadas</h2>
+            <ul id="recommendations-list"></ul>
+        </div>
         <div class="chart-container">
             <div class="chart-box" id="chart-monthly-trend"></div>
             <div class="chart-box" id="chart-responsable"></div>
@@ -65,44 +73,68 @@
     const months = ['Todos', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const normalizeHeader = (header) => header.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_|_$/g, '');
 
-        async function loadAllData() {
-    try {
-        const [devolucionesResult, despachosResult] = await Promise.all([
-            fetchAndParse('https://raw.githubusercontent.com/wynco0919/Dashboard-Devoluciones/main/devoluciones.csv'),
-            fetchAndParse('https://raw.githubusercontent.com/wynco0919/Dashboard-Devoluciones/main/despachos.csv')
-        ]);
-                        
-            processDevoluciones(devolucionesResult);
-            processDespachos(despachosResult);
-
-            if (fullCleanedData.length > 0 && despachosPorMes.length > 0) {
-                document.getElementById('loader').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
-                createMonthButtons();
-                resetAll();
-            } else {
-                 document.getElementById('loader').textContent = "Error al procesar los datos. Verifique que los archivos en GitHub tengan el formato y contenido correctos.";
-            }
-
-        } catch (error) {
-            document.getElementById('loader').textContent = `Error al cargar archivos. Asegúrate de que los archivos 'devoluciones.csv' y 'despachos.csv' existen en GitHub y son públicos. Causa: ${error.message}`;
-            console.error("Error de carga:", error);
+    async function loadAllData() { /* ... sin cambios ... */ }
+    function fetchAndParse(url) { /* ... sin cambios ... */ }
+    function processDevoluciones(parsedResult) { /* ... sin cambios ... */ }
+    function processDespachos(parsedResult) { /* ... sin cambios ... */ }
+    function createMonthButtons() { /* ... sin cambios ... */ }
+    function filterByMonth(monthIndex) { activeMonth = monthIndex; applyAllFilters(); }
+    function applyCrossFilter(key, value) { activeFilter = { key, value }; applyAllFilters(); }
+    function resetAll() { activeMonth = 0; activeFilter = {}; applyAllFilters(); }
+    
+    function applyAllFilters() {
+        let data = fullCleanedData;
+        if (activeMonth !== 0) { data = data.filter(d => d.mes === activeMonth); }
+        if (activeFilter.key) {
+            data = data.filter(d => d[activeFilter.key] && d[activeFilter.key].toUpperCase() === activeFilter.value.toUpperCase());
+            document.getElementById('current-filter').innerHTML = `<strong>Filtro:</strong> ${activeFilter.key.charAt(0).toUpperCase() + activeFilter.key.slice(1)} = <i>${activeFilter.value}</i>`;
+        } else {
+            const monthName = activeMonth === 0 ? 'General' : months[activeMonth];
+            document.getElementById('current-filter').innerHTML = `<strong>Vista:</strong> ${monthName}`;
         }
+        document.querySelectorAll('#month-buttons button').forEach((btn, index) => btn.classList.toggle('active', index === activeMonth));
+        updateKPIs(data);
+        const dataForCharts = data.filter(d => d.cajas_devueltas > 0);
+        drawDashboard(dataForCharts);
+        updateRecommendations(dataForCharts);
+        drawMonthlyTrendChart();
     }
+    
+    function updateKPIs(data) {
+        const kpiContainer = document.querySelector('.kpi-container');
+        kpiContainer.innerHTML = `<div class="kpi-box"><div id="kpi-total-cajas" class="value">0</div><div class="label">Total Cajas Devueltas</div></div> <div class="kpi-box"><div id="kpi-pct-devolucion" class="value">-</div><div class="label">% Devolución (Mes Sel.)</div></div> <div class="kpi-box"><div id="kpi-total-docs" class="value">0</div><div class="label">Total Documentos</div></div> <div class="kpi-box"><div id="kpi-dev-fisica" class="value">0</div><div class="label">Docs. Dev. Física</div></div> <div class="kpi-box"><div id="kpi-dev-financiera" class="value">0</div><div class="label">Docs. Dev. Financiera</div></div>`;
+        
+        const dataWithDevoluciones = data.filter(d => d.cajas_devueltas > 0 || d.tipo_de_devolucion === 'FINANCIERO'); // Incluir financieras aunque no tengan cajas
+        const totalCajas = dataWithDevoluciones.reduce((sum, d) => sum + d.cajas_devueltas, 0);
+        
+        const devFisicaDocs = new Set(dataWithDevoluciones.filter(d => d.tipo_de_devolucion === 'FISICO').map(d => d.factura_nota));
+        const devFinancieraDocs = new Set(dataWithDevoluciones.filter(d => d.tipo_de_devolucion === 'FINANCIERO').map(d => d.factura_nota));
+        const allUniqueDocs = new Set([...devFisicaDocs, ...devFinancieraDocs]);
 
-    // El resto de las funciones se mantienen igual
+        document.getElementById('kpi-total-cajas').textContent = totalCajas.toLocaleString('es-ES');
+        document.getElementById('kpi-total-docs').textContent = allUniqueDocs.size.toLocaleString('es-ES');
+        document.getElementById('kpi-dev-fisica').textContent = devFisicaDocs.size.toLocaleString('es-ES');
+        document.getElementById('kpi-dev-financiera').textContent = devFinancieraDocs.size.toLocaleString('es-ES');
+
+        let cajasDespachadas = 0;
+        if (activeMonth !== 0) {
+            const despachoMes = despachosPorMes.find(d => d.mes === activeMonth);
+            cajasDespachadas = despachoMes ? despachoMes.cajas_despachadas : 0;
+        }
+        const pctDevolucion = (cajasDespachadas > 0) ? (totalCajas / cajasDespachadas) * 100 : 0;
+        const pctElement = document.getElementById('kpi-pct-devolucion');
+        pctElement.textContent = (activeMonth !== 0 && cajasDespachadas > 0) ? `${pctDevolucion.toFixed(2)}%` : (activeMonth !== 0 ? 'N/A' : '-');
+    }
+    
+    // El resto de funciones (sin cambios)
+    async function loadAllData() { try { const [devolucionesResult, despachosResult] = await Promise.all([ fetchAndParse('https://cdn.jsdelivr.net/gh/wynco0919/Dashboard-Devoluciones/main/devoluciones.csv'), fetchAndParse('https://cdn.jsdelivr.net/gh/wynco0919/Dashboard-Devoluciones/main/despachos.csv') ]); processDevoluciones(devolucionesResult); processDespachos(despachosResult); if (fullCleanedData.length > 0 && despachosPorMes.length > 0) { document.getElementById('loader').classList.add('hidden'); document.getElementById('dashboard-content').classList.remove('hidden'); createMonthButtons(); resetAll(); } else { document.getElementById('loader').textContent = "Error al procesar datos. Verifique archivos en GitHub."; } } catch (error) { document.getElementById('loader').textContent = `Error al cargar archivos: ${error.message}`; console.error("Error de carga:", error); } }
     function fetchAndParse(url) { return new Promise((resolve, reject) => { Papa.parse(url, { download: true, header: true, dynamicTyping: true, skipEmptyLines: 'greedy', complete: resolve, error: reject }); }); }
     function processDevoluciones(parsedResult) { const data = parsedResult.data; const meta = parsedResult.meta; const headers = meta.fields.map(normalizeHeader); const requiredCols = ['cajas_devueltas', 'responsable', 'motivo', 'producto', 'zona', 'mes', 'factura_nota', 'tipo_de_devolucion', 'cliente']; for (const col of requiredCols) { if (!headers.includes(col)) { throw new Error(`Falta la columna '${col}' en devoluciones.csv`); } } fullCleanedData = data.map(row => { if (!row || typeof row !== 'object' || Object.keys(row).length < 2) return null; const normalizedRow = {}; meta.fields.forEach(field => { const normalizedKey = normalizeHeader(field); normalizedRow[normalizedKey] = row[field]; }); const cleanNumber = (val) => parseInt(String(val || '0').replace(/[.,]/g, ''), 10) || 0; return { cajas_devueltas: cleanNumber(normalizedRow.cajas_devueltas), responsable: String(normalizedRow.responsable || 'S/D').trim().toUpperCase(), motivo: String(normalizedRow.motivo || 'S/D').trim().toUpperCase(), producto: String(normalizedRow.producto || 'S/D').trim(), zona: String(normalizedRow.zona || 'S/D').trim().toUpperCase(), cliente: String(normalizedRow.cliente || 'S/D').trim(), mes: parseInt(normalizedRow.mes, 10) || 0, factura_nota: String(normalizedRow.factura_nota || '').trim(), tipo_de_devolucion: String(normalizedRow.tipo_de_devolucion || 'S/D').trim().toUpperCase(), n_control: normalizedRow.n_control }; }).filter(d => d !== null); }
     function processDespachos(parsedResult) { const data = parsedResult.data; const meta = parsedResult.meta; const headers = meta.fields.map(normalizeHeader); const requiredCols = ['mes', 'cajas_despachadas']; for (const col of requiredCols) { if (!headers.includes(col)) { throw new Error(`Falta la columna '${col}' en despachos.csv`); } } despachosPorMes = data.map(row => { const normalizedRow = {}; meta.fields.forEach(field => { const normalizedKey = normalizeHeader(field); normalizedRow[normalizedKey] = row[field]; }); return { mes: parseInt(normalizedRow.mes, 10) || 0, cajas_despachadas: parseInt(String(normalizedRow.cajas_despachadas || '0').replace(/[.,]/g, ''), 10) || 0 }; }).filter(d => d.mes >= 1 && d.mes <= 12); }
-    function createMonthButtons() { const container = document.getElementById('month-buttons'); container.innerHTML = ''; months.forEach((month, index) => { const button = document.createElement('button'); button.textContent = month; button.onclick = () => filterByMonth(index); container.appendChild(button); }); }
-    function filterByMonth(monthIndex) { activeMonth = monthIndex; applyAllFilters(); }
-    function applyCrossFilter(key, value) { activeFilter = { key, value }; applyAllFilters(); }
-    function applyAllFilters() { let data = fullCleanedData; if (activeMonth !== 0) { data = data.filter(d => d.mes === activeMonth); } if (activeFilter.key) { data = data.filter(d => d[activeFilter.key] && d[activeFilter.key].toUpperCase() === activeFilter.value.toUpperCase()); document.getElementById('current-filter').innerHTML = `<strong>Filtro:</strong> ${activeFilter.key.charAt(0).toUpperCase() + activeFilter.key.slice(1)} = <i>${activeFilter.value}</i>`; } else { const monthName = activeMonth === 0 ? 'General' : months[activeMonth]; document.getElementById('current-filter').innerHTML = `<strong>Vista:</strong> ${monthName}`; } document.querySelectorAll('#month-buttons button').forEach((btn, index) => btn.classList.toggle('active', index === activeMonth)); currentFilteredData = data; drawDashboard(currentFilteredData.filter(d => d.cajas_devueltas > 0)); updateKPIs(currentFilteredData); drawMonthlyTrendChart(); }
-    function resetAll() { activeMonth = 0; activeFilter = {}; applyAllFilters(); }
-    function updateKPIs(data) { const kpiContainer = document.querySelector('.kpi-container'); kpiContainer.innerHTML = `<div class="kpi-box"><div id="kpi-total-cajas" class="value">0</div><div class="label">Total Cajas Devueltas</div></div> <div class="kpi-box"><div id="kpi-pct-devolucion" class="value">-</div><div class="label">% Devolución (Mes Sel.)</div></div> <div class="kpi-box"><div id="kpi-total-docs" class="value">0</div><div class="label">Total Documentos</div></div> <div class="kpi-box"><div id="kpi-dev-fisica" class="value">0</div><div class="label">Docs. Dev. Física</div></div> <div class="kpi-box"><div id="kpi-dev-financiera" class="value">0</div><div class="label">Docs. Dev. Financiera</div></div>`; const totalCajas = data.reduce((sum, d) => sum + d.cajas_devueltas, 0); const uniqueDocs = new Set(data.filter(d => d.factura_nota).map(d => d.factura_nota)).size; const devFisicaDocs = new Set(data.filter(d => d.tipo_de_devolucion === 'FISICO' && d.factura_nota).map(d => d.factura_nota)).size; const devFinancieraDocs = new Set(data.filter(d => d.tipo_de_devolucion === 'FINANCIERO' && d.factura_nota).map(d => d.factura_nota)).size; document.getElementById('kpi-total-cajas').textContent = totalCajas.toLocaleString('es-ES'); document.getElementById('kpi-total-docs').textContent = uniqueDocs.toLocaleString('es-ES'); document.getElementById('kpi-dev-fisica').textContent = devFisicaDocs.toLocaleString('es-ES'); document.getElementById('kpi-dev-financiera').textContent = devFinancieraDocs.toLocaleString('es-ES'); let cajasDespachadas = 0; if (activeMonth !== 0) { const despachoMes = despachosPorMes.find(d => d.mes === activeMonth); cajasDespachadas = despachoMes ? despachoMes.cajas_despachadas : 0; } const pctDevolucion = (cajasDespachadas > 0) ? (totalCajas / cajasDespachadas) * 100 : 0; const pctElement = document.getElementById('kpi-pct-devolucion'); pctElement.textContent = (activeMonth !== 0 && cajasDespachadas > 0) ? `${pctDevolucion.toFixed(2)}%` : (activeMonth !== 0 ? 'N/A' : '-'); }
     function drawMonthlyTrendChart() { const monthlyDevoluciones = {}; fullCleanedData.forEach(d => { if (!d.mes || d.mes < 1 || d.mes > 12) return; if (!monthlyDevoluciones[d.mes]) { monthlyDevoluciones[d.mes] = 0; } monthlyDevoluciones[d.mes] += d.cajas_devueltas; }); const monthlyPercentages = []; for (let i = 1; i <= 12; i++) { const despachoMes = despachosPorMes.find(d => d.mes === i); const totalDespachado = despachoMes ? despachoMes.cajas_despachadas : 0; const totalDevuelto = monthlyDevoluciones[i] || 0; const percentage = totalDespachado > 0 ? (totalDevuelto / totalDespachado) * 100 : 0; monthlyPercentages.push(percentage); } const data = [{ x: months.slice(1), y: monthlyPercentages, type: 'scatter', mode: 'lines+markers+text', text: monthlyPercentages.map(p => `${p.toFixed(2)}%`), textposition: 'top center', textfont: { family: 'Arial, sans-serif', size: 12, color: '#003366' }, line: { color: '#005a9e', width: 3 }, marker: { size: 8 } }]; const layout = { title: '<b>% de Devolución Mensual vs Despacho</b>', xaxis: { title: 'Mes' }, yaxis: { title: '% Devolución', ticksuffix: '%' }, margin: { t: 80, r: 20, b: 50, l: 50 }, paper_bgcolor: 'white', plot_bgcolor: 'white' }; Plotly.react('chart-monthly-trend', data, layout); }
     function drawDashboard(data) { const responsableAgg = aggregateData(data, 'responsable'); const motivoAgg = aggregateData(data, 'motivo'); const productoAgg = aggregateData(data, 'producto'); const zonaAgg = aggregateData(data, 'zona'); const clienteAgg = aggregateData(data, 'cliente'); const commonLayout = { margin: { l: 200, r: 20, t: 60, b: 70 }, paper_bgcolor: 'white', plot_bgcolor: 'white', yaxis: { autorange: 'reversed' }, height: 450, xaxis: { showgrid: true, gridcolor: '#e9e9e9' } }; Plotly.react('chart-responsable', [{ x: Object.values(responsableAgg), y: Object.keys(responsableAgg), type: 'bar', orientation: 'h', text: Object.values(responsableAgg).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(23, 190, 207, 0.8)' } }], { ...commonLayout, title: '<b>Devoluciones por Responsable</b>' }); Plotly.react('chart-motivo', [{ x: Object.values(motivoAgg).slice(0, 15), y: Object.keys(motivoAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(motivoAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(214, 39, 40, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Motivos</b>' }); Plotly.react('chart-producto', [{ x: Object.values(productoAgg).slice(0, 15), y: Object.keys(productoAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(productoAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(44, 160, 44, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Productos</b>' }); Plotly.react('chart-zona', [{ x: Object.values(zonaAgg).slice(0, 15), y: Object.keys(zonaAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(zonaAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(255, 127, 14, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Zonas</b>' }); Plotly.react('chart-cliente', [{ x: Object.values(clienteAgg).slice(0, 15), y: Object.keys(clienteAgg).slice(0, 15), type: 'bar', orientation: 'h', text: Object.values(clienteAgg).slice(0, 15).map(v => v.toLocaleString('es-ES')), textposition: 'auto', marker: { color: 'rgba(148, 103, 189, 0.8)' } }], { ...commonLayout, title: '<b>Top 15 Clientes</b>' }); }
     function aggregateData(data, key) { const aggregation = data.reduce((acc, curr) => { const keyValue = curr[key] || 'SIN DATOS'; acc[keyValue] = (acc[keyValue] || 0) + curr.cajas_devueltas; return acc; }, {}); return Object.entries(aggregation).sort(([, a], [, b]) => b - a).reduce((r, [k, v]) => ({ ...r, [k]: v }), {}); }
+    function updateRecommendations(data) { const list = document.getElementById('recommendations-list'); list.innerHTML = ''; if (data.length < 3) { list.innerHTML = '<li>No hay suficientes datos en la vista actual para generar recomendaciones detalladas.</li>'; return; } const responsableAgg = aggregateData(data, 'responsable'); const motivoAgg = aggregateData(data, 'motivo'); const productoAgg = aggregateData(data, 'producto'); const clienteAgg = aggregateData(data, 'cliente'); const topResponsable = Object.keys(responsableAgg)[0]; const topMotivo = Object.keys(motivoAgg)[0]; const topProducto = Object.keys(productoAgg)[0]; const topCliente = Object.keys(clienteAgg)[0]; let recommendations = []; if (topResponsable && responsableAgg[topResponsable] > 0) { recommendations.push(`El área de <strong>${topResponsable}</strong> es la principal responsable con <strong>${responsableAgg[topResponsable].toLocaleString()} cajas</strong> devueltas. <strong>Acción Sugerida:</strong> Focalizar la investigación en los procesos de esta área.`); } if (topMotivo && motivoAgg[topMotivo] > 0) { let action = "Revisar la causa raíz de este problema."; if (topMotivo.includes('NO SOLICITADA')) { action = "Implementar un proceso de confirmación de pedido con los clientes antes de facturar."; } else if (topMotivo.includes('DAÑADO')) { action = "Auditar el empaque y los protocolos de manejo del transportista."; } else if (topMotivo.includes('VENCIMIENTO')) { action = "Revisar la política de rotación de inventario (FEFO) en el almacén."; } recommendations.push(`<strong>${topMotivo}</strong> es el motivo N°1 de devoluciones. <strong>Acción Sugerida:</strong> ${action}`); } if (topProducto && productoAgg[topProducto] > 0) { recommendations.push(`El producto <strong>${topProducto}</strong> es el más devuelto. <strong>Acción Sugerida:</strong> Iniciar una investigación de calidad específica para este SKU.`); } if (topCliente && clienteAgg[topCliente] > 0) { recommendations.push(`El cliente <strong>${topCliente}</strong> presenta el mayor volumen de devoluciones. <strong>Acción Sugerida:</strong> El asesor de cuenta debería contactar al cliente para entender las causas.`); } if (recommendations.length > 0) { recommendations.forEach(rec => { list.innerHTML += `<li>${rec}</li>`; }); } else { list.innerHTML = '<li>No se identificaron patrones claros en la selección de datos actual.</li>'; } }
     document.addEventListener('DOMContentLoaded', function() {
         loadAllData();
         document.getElementById('chart-responsable').on('plotly_click', data => { if(data.points.length > 0) applyCrossFilter('responsable', data.points[0].y); });
