@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Wynco | Dashboard de Gestión Logística v3.0</title>
+    <title>Wynco | Dashboard de Gestión Logística</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -16,15 +16,15 @@
         .yoy { font-size: 0.95em; font-weight: bold; }
         .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .chart-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .insight { background: #eef2f7; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); line-height: 1.4; }
+        .insight { background: #eef2f7; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); }
         .trend-up { color: var(--danger); }
         .trend-down { color: var(--accent); }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Wynco: Inteligencia de Despachos vs Devoluciones</h1>
-        <div id="status">Cargando datos desde GitHub...</div>
+        <h1>Wynco: Despachos vs Devoluciones (2025-2026)</h1>
+        <div id="status">Sincronizando con GitHub...</div>
     </div>
 
     <div class="grid-kpis">
@@ -36,12 +36,12 @@
         <div class="card">
             <h3>Total Despachado 2026</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.8em; color: gray;">Acumulado Cajas</div>
+            <div style="font-size: 0.8em; color: gray;">Acumulado Anual</div>
         </div>
         <div class="card">
             <h3>Total Cajas Devueltas</h3>
             <div id="total-dev" class="value">0</div>
-            <div style="font-size: 0.8em; color: gray;">Impacto en Inventario</div>
+            <div style="font-size: 0.8em; color: gray;">2026 (Cajas Físicas)</div>
         </div>
     </div>
 
@@ -57,9 +57,9 @@
     </div>
 
     <script>
-        // URLs RAW de tus archivos en GitHub
-        const URL_DES = "https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/main/despachos.csv";
-        const URL_DEV = "https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/main/devoluciones.csv";
+        // --- CAMBIA ESTAS URLS POR LAS TUYAS (BOTÓN RAW EN GITHUB) ---
+        const URL_DES = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/despachos.csv";
+        const URL_DEV = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/devoluciones.csv";
 
         async function cargar() {
             try {
@@ -68,36 +68,34 @@
                     fetch(URL_DEV).then(res => res.text())
                 ]);
 
-                // Parsear CSVs (Ambos usan punto y coma en tu caso)
                 const dDes = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";"}).data;
                 const dDev = Papa.parse(rDev, {header:true, skipEmptyLines:true, delimiter:";"}).data;
 
                 procesar(dDes, dDev);
-                document.getElementById('status').innerText = "Sincronizado: " + new Date().toLocaleTimeString();
+                document.getElementById('status').innerText = "Última Actualización: " + new Date().toLocaleTimeString();
             } catch(e) { 
-                document.getElementById('status').innerText = "Error: Revisa las URLs de GitHub.";
+                document.getElementById('status').innerText = "Error: Verifica los links de GitHub.";
             }
         }
 
         function procesar(des, dev) {
-            // 1. Filtrar Despachos por año
+            // Filtrar Despachos
             const v26 = des.filter(r => r.año == "2026").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0);
             const v25 = des.filter(r => r.año == "2025").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0) || 1;
 
-            // 2. Filtrar Devoluciones por año
+            // Filtrar Devoluciones (buscando el año en la fecha de registro)
             const dev26 = dev.filter(r => r.fecha_registro && r.fecha_registro.includes('2026'));
             const dev25 = dev.filter(r => r.fecha_registro && r.fecha_registro.includes('2025'));
 
-            // 3. Sumar Cajas Devueltas (Nota: tiene espacios en el CSV original)
-            const c26 = dev26.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || b['cajas_devueltas'] || 0), 0);
-            const c25 = dev25.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || b['cajas_devueltas'] || 0), 0);
+            // Sumar Cajas
+            const c26 = dev26.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || 0), 0);
+            const c25 = dev25.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || 0), 0);
 
-            // 4. Calcular %
+            // KPIs
             const p26 = (c26 / v26) * 100;
             const p25 = (c25 / v25) * 100;
             const diff = p26 - p25;
 
-            // Actualizar UI
             document.getElementById('perc-cajas').innerText = p26.toFixed(2) + "%";
             document.getElementById('total-vol').innerText = Math.round(v26).toLocaleString();
             document.getElementById('total-dev').innerText = Math.round(c26).toLocaleString();
@@ -106,37 +104,29 @@
             const trendClass = diff > 0 ? 'trend-up' : 'trend-down';
             document.getElementById('yoy-cajas').innerHTML = `<span class="${trendClass}">${trendIcon} ${Math.abs(diff).toFixed(2)}%</span> vs 2025`;
 
-            // Alerta si > 3%
             if(p26 > 3) document.getElementById('card-cajas').classList.add('critico');
 
-            // --- GRÁFICOS ---
-            // Por Transporte
+            // Gráfico Transporte
             const tMap = {};
-            dev26.forEach(r => {
+            dev26.forEach(r => { 
                 const t = r.transporte || 'S/D';
-                tMap[t] = (tMap[t] || 0) + parseFloat(r[' cajas_devueltas '] || 0);
+                tMap[t] = (tMap[t] || 0) + parseFloat(r[' cajas_devueltas '] || 0); 
             });
             Plotly.newPlot('chart-transporte', [{
-                x: Object.keys(tMap), y: Object.values(tMap), type: 'bar', marker: {color: '#003366'}
-            }], {title: 'Cajas Devueltas por Transporte'});
+                x: Object.keys(tMap), y: Object.values(tMap), type:'bar', marker:{color:'#003366'}
+            }], {title:'Cajas Devueltas por Transporte'});
 
-            // Sugerencia Inteligente
             const topT = Object.keys(tMap).reduce((a, b) => tMap[a] > tMap[b] ? a : b, "N/A");
-            document.getElementById('obs-transporte').innerHTML = `<strong>Acción sugerida:</strong> El transporte <b>${topT}</b> concentra el mayor volumen devuelto. Se recomienda revisar su proceso de despacho.`;
+            document.getElementById('obs-transporte').innerHTML = `<strong>Sugerencia:</strong> El transporte <b>${topT}</b> concentra las devoluciones. Revisar protocolos de entrega.`;
 
-            // Por Motivo
+            // Gráfico Motivos
             const mMap = {};
-            dev26.forEach(r => {
-                const m = r.motivo || 'Otros';
-                mMap[m] = (mMap[m] || 0) + 1;
-            });
-            Plotly.newPlot('chart-motivos', [{
-                labels: Object.keys(mMap), values: Object.values(mMap), type: 'pie', hole: 0.4
-            }], {title: 'Motivos de Devolución'});
+            dev26.forEach(r => { mMap[r.motivo] = (mMap[r.motivo] || 0) + 1; });
+            Plotly.newPlot('chart-motivos', [{labels:Object.keys(mMap), values:Object.values(mMap), type:'pie', hole:0.4}], {title:'Motivos principales'});
             
-            document.getElementById('obs-motivos').innerHTML = `<strong>Tendencia:</strong> El motivo más frecuente es <b>${Object.keys(mMap).reduce((a, b) => mMap[a] > mMap[b] ? a : b, "N/A")}</b>.`;
+            const topM = Object.keys(mMap).reduce((a, b) => mMap[a] > mMap[b] ? a : b, "N/A");
+            document.getElementById('obs-motivos').innerHTML = `<strong>Tendencia:</strong> El motivo principal es <b>${topM}</b>.`;
         }
-
         window.onload = cargar;
     </script>
 </body>
