@@ -2,28 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Wynco | Dashboard de Gestión Logística</title>
+    <title>Wynco | Dashboard de Gestión Logística 2026</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #003366; --accent: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
         .header { background: var(--primary); color: white; padding: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 20px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid var(--primary); text-align: center; }
         .card.critico { border-top-color: var(--danger); background: #fff5f5; }
         .value { font-size: 2.2em; font-weight: bold; margin: 10px 0; color: var(--primary); }
-        .yoy { font-size: 0.95em; font-weight: bold; }
         .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .chart-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .insight { background: #eef2f7; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); }
-        .trend-up { color: var(--danger); }
-        .trend-down { color: var(--accent); }
+        .insight { background: #eef2f7; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); font-weight: 500; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Wynco: Despachos vs Devoluciones (2025-2026)</h1>
+        <h1>Wynco: Gestión de Despachos vs Devoluciones (Año 2026)</h1>
         <div id="status">Sincronizando con GitHub...</div>
     </div>
 
@@ -31,17 +28,17 @@
         <div class="card" id="card-cajas">
             <h3>% Devolución Cajas (2026)</h3>
             <div id="perc-cajas" class="value">0%</div>
-            <div id="yoy-cajas" class="yoy">--</div>
+            <div style="font-size: 0.85em; color: #666;">Indicador de Gestión Metas</div>
         </div>
         <div class="card">
             <h3>Total Despachado 2026</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.8em; color: gray;">Acumulado Anual</div>
+            <div style="font-size: 0.85em; color: #666;">Acumulado Cajas</div>
         </div>
         <div class="card">
             <h3>Total Cajas Devueltas</h3>
             <div id="total-dev" class="value">0</div>
-            <div style="font-size: 0.8em; color: gray;">2026 (Cajas Físicas)</div>
+            <div style="font-size: 0.85em; color: #666;">Impacto Total en Inventario</div>
         </div>
     </div>
 
@@ -57,7 +54,7 @@
     </div>
 
     <script>
-        // --- CAMBIA ESTAS URLS POR LAS TUYAS (BOTÓN RAW EN GITHUB) ---
+        // URLs RAW oficiales de tu repositorio
         const URL_DES = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/despachos.csv";
         const URL_DEV = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/devoluciones.csv";
 
@@ -74,58 +71,60 @@
                 procesar(dDes, dDev);
                 document.getElementById('status').innerText = "Última Actualización: " + new Date().toLocaleTimeString();
             } catch(e) { 
-                document.getElementById('status').innerText = "Error: Verifica los links de GitHub.";
+                document.getElementById('status').innerText = "Error: Verifica los archivos en GitHub.";
             }
         }
 
         function procesar(des, dev) {
-            // Filtrar Despachos
-            const v26 = des.filter(r => r.año == "2026").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0);
-            const v25 = des.filter(r => r.año == "2025").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0) || 1;
+            // Filtrar Despachos solo 2026
+            const v26 = des.filter(r => r.año == "2026" || r.anio == "2026").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0);
 
-            // Filtrar Devoluciones (buscando el año en la fecha de registro)
+            // Filtrar Devoluciones solo 2026
             const dev26 = dev.filter(r => r.fecha_registro && r.fecha_registro.includes('2026'));
-            const dev25 = dev.filter(r => r.fecha_registro && r.fecha_registro.includes('2025'));
 
-            // Sumar Cajas
-            const c26 = dev26.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || 0), 0);
-            const c25 = dev25.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || 0), 0);
+            // Sumar Cajas Devueltas (Soporta si tiene espacios el CSV)
+            const c26 = dev26.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || b['cajas_devueltas'] || 0), 0);
 
-            // KPIs
-            const p26 = (c26 / v26) * 100;
-            const p25 = (c25 / v25) * 100;
-            const diff = p26 - p25;
+            // Calcular KPI Principal
+            const p26 = v26 > 0 ? (c26 / v26) * 100 : 0;
 
+            // Actualizar Tarjetas
             document.getElementById('perc-cajas').innerText = p26.toFixed(2) + "%";
             document.getElementById('total-vol').innerText = Math.round(v26).toLocaleString();
             document.getElementById('total-dev').innerText = Math.round(c26).toLocaleString();
-            
-            const trendIcon = diff > 0 ? '▲' : '▼';
-            const trendClass = diff > 0 ? 'trend-up' : 'trend-down';
-            document.getElementById('yoy-cajas').innerHTML = `<span class="${trendClass}">${trendIcon} ${Math.abs(diff).toFixed(2)}%</span> vs 2025`;
 
+            // Alerta visual si supera el umbral crítico del 3%
             if(p26 > 3) document.getElementById('card-cajas').classList.add('critico');
 
-            // Gráfico Transporte
+            // --- GRÁFICO TRANSPORTE ---
             const tMap = {};
             dev26.forEach(r => { 
-                const t = r.transporte || 'S/D';
-                tMap[t] = (tMap[t] || 0) + parseFloat(r[' cajas_devueltas '] || 0); 
+                const t = r.transporte ? r.transporte.trim() : 'S/D';
+                tMap[t] = (tMap[t] || 0) + parseFloat(r[' cajas_devueltas '] || r['cajas_devueltas'] || 0); 
             });
+
             Plotly.newPlot('chart-transporte', [{
                 x: Object.keys(tMap), y: Object.values(tMap), type:'bar', marker:{color:'#003366'}
             }], {title:'Cajas Devueltas por Transporte'});
 
             const topT = Object.keys(tMap).reduce((a, b) => tMap[a] > tMap[b] ? a : b, "N/A");
-            document.getElementById('obs-transporte').innerHTML = `<strong>Sugerencia:</strong> El transporte <b>${topT}</b> concentra las devoluciones. Revisar protocolos de entrega.`;
+            document.getElementById('obs-transporte').innerHTML = `<strong>Sugerencia de Control:</strong> El transporte/chofer <b>${topT}</b> acumula el mayor volumen devuelto en 2026.`;
 
-            // Gráfico Motivos
+            // --- GRÁFICO MOTIVOS ---
             const mMap = {};
-            dev26.forEach(r => { mMap[r.motivo] = (mMap[r.motivo] || 0) + 1; });
-            Plotly.newPlot('chart-motivos', [{labels:Object.keys(mMap), values:Object.values(mMap), type:'pie', hole:0.4}], {title:'Motivos principales'});
+            dev26.forEach(r => { 
+                if (r.motivo) {
+                    const m = r.motivo.trim();
+                    mMap[m] = (mMap[m] || 0) + 1; 
+                }
+            });
+
+            Plotly.newPlot('chart-motivos', [{
+                labels: Object.keys(mMap), values: Object.values(mMap), type:'pie', hole:0.4
+            }], {title:'Motivos de Devolución 2026'});
             
             const topM = Object.keys(mMap).reduce((a, b) => mMap[a] > mMap[b] ? a : b, "N/A");
-            document.getElementById('obs-motivos').innerHTML = `<strong>Tendencia:</strong> El motivo principal es <b>${topM}</b>.`;
+            document.getElementById('obs-motivos').innerHTML = `<strong>Tendencia Anual:</strong> La causa más recurrente documentada es <b>${topM}</b>.`;
         }
         window.onload = cargar;
     </script>
