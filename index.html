@@ -54,7 +54,6 @@
     </div>
 
     <script>
-        // URLs RAW oficiales de tu repositorio
         const URL_DES = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/despachos.csv";
         const URL_DEV = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/devoluciones.csv";
 
@@ -65,27 +64,34 @@
                     fetch(URL_DEV).then(res => res.text())
                 ]);
 
-                const dDes = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";"}).data;
-                const dDev = Papa.parse(rDev, {header:true, skipEmptyLines:true, delimiter:";"}).data;
+                // Limpiador automático de títulos de columnas
+                const transformarHeaders = (header) => header.trim().toLowerCase();
+
+                const dDes = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: transformarHeaders}).data;
+                const dDev = Papa.parse(rDev, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: transformarHeaders}).data;
 
                 procesar(dDes, dDev);
                 document.getElementById('status').innerText = "Última Actualización: " + new Date().toLocaleTimeString();
             } catch(e) { 
-                document.getElementById('status').innerText = "Error: Verifica los archivos en GitHub.";
+                console.error(e);
+                document.getElementById('status').innerText = "Error procesando los datos.";
             }
         }
 
         function procesar(des, dev) {
-            // Filtrar Despachos solo 2026
-            const v26 = des.filter(r => r.año == "2026" || r.anio == "2026").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0);
+            // 1. Calcular Despachos 2026
+            const v26 = des.filter(r => r['año'] == "2026" || r['anio'] == "2026").reduce((a,b) => a + parseFloat(b['cajas despachadas'] || 0), 0);
 
-            // Filtrar Devoluciones solo 2026
-            const dev26 = dev.filter(r => r.fecha_registro && r.fecha_registro.includes('2026'));
+            // 2. Filtrar Devoluciones usando la columna exacta 'fecha fact.'
+            const dev26 = dev.filter(r => {
+                const fecha = r['fecha fact.'] || r['fecha_registro'] || r['fecha fact'] || '';
+                return fecha.includes('2026');
+            });
 
-            // Sumar Cajas Devueltas (Soporta si tiene espacios el CSV)
-            const c26 = dev26.reduce((a,b) => a + parseFloat(b[' cajas_devueltas '] || b['cajas_devueltas'] || 0), 0);
+            // 3. Sumar Cajas Devueltas
+            const c26 = dev26.reduce((a,b) => a + parseFloat(b['cajas_devueltas'] || 0), 0);
 
-            // Calcular KPI Principal
+            // 4. Calcular % KPI
             const p26 = v26 > 0 ? (c26 / v26) * 100 : 0;
 
             // Actualizar Tarjetas
@@ -93,14 +99,13 @@
             document.getElementById('total-vol').innerText = Math.round(v26).toLocaleString();
             document.getElementById('total-dev').innerText = Math.round(c26).toLocaleString();
 
-            // Alerta visual si supera el umbral crítico del 3%
             if(p26 > 3) document.getElementById('card-cajas').classList.add('critico');
 
             // --- GRÁFICO TRANSPORTE ---
             const tMap = {};
             dev26.forEach(r => { 
-                const t = r.transporte ? r.transporte.trim() : 'S/D';
-                tMap[t] = (tMap[t] || 0) + parseFloat(r[' cajas_devueltas '] || r['cajas_devueltas'] || 0); 
+                const t = r['transporte'] ? r['transporte'].trim() : 'S/D';
+                tMap[t] = (tMap[t] || 0) + parseFloat(r['cajas_devueltas'] || 0); 
             });
 
             Plotly.newPlot('chart-transporte', [{
@@ -113,8 +118,8 @@
             // --- GRÁFICO MOTIVOS ---
             const mMap = {};
             dev26.forEach(r => { 
-                if (r.motivo) {
-                    const m = r.motivo.trim();
+                if (r['motivo']) {
+                    const m = r['motivo'].trim();
                     mMap[m] = (mMap[m] || 0) + 1; 
                 }
             });
