@@ -1,33 +1,153 @@
-// --- PROCESAMIENTO DATA REVISADA 2026 ---
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Wynco | Dashboard Gerencial de Devoluciones 2026</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root { --primary: #003366; --accent: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; --dark: #2c3e50; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--dark); }
+        .header { background: var(--primary); color: white; padding: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .selector-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 20px; align-items: center; }
+        select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; color: var(--dark); font-weight: bold; }
+        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; }
+        .card.critico { border-top-color: var(--danger); background: #fff5f5; }
+        .value { font-size: 1.9em; font-weight: bold; margin: 8px 0; color: var(--primary); }
+        .trend { font-size: 0.9em; font-weight: bold; margin-top: 5px; }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 20px; }
+        .chart-box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 480px; }
+        .insight { background: #eef2f7; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Wynco: Inteligencia Operativa de Devoluciones</h1>
+        <div id="status">Sincronizando con bases de datos...</div>
+    </div>
+
+    <div class="selector-box">
+        <div>
+            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
+            <select id="mesA" onchange="actualizarDashboard()"></select>
+        </div>
+        <div>
+            <label for="mesB" style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
+            <select id="mesB" onchange="actualizarDashboard()"></select>
+        </div>
+    </div>
+
+    <div class="grid-kpis">
+        <div class="card" id="card-cajas-A">
+            <h3 id="titulo-kpi-A">% Devolución Mes A</h3>
+            <div id="perc-cajas-A" class="value">0.00%</div>
+            <div style="font-size: 0.8em; color: #666;">Meta de Gestión: Máx 1.00%</div>
+        </div>
+        <div class="card" id="card-cajas-B">
+            <h3 id="titulo-kpi-B">% Devolución Mes B</h3>
+            <div id="perc-cajas-B" class="value">0.00%</div>
+            <div id="trend-comparativo" class="trend">--</div>
+        </div>
+        <div class="card">
+            <h3>Cajas Devueltas (Mes Base A)</h3>
+            <div id="kpi-cajas-A-solo" class="value">0</div>
+            <div style="font-size: 0.8em; color: #666;">Volumen físico devuelto en A</div>
+        </div>
+        <div class="card">
+            <h3>Total Cajas Devueltas (A + B)</h3>
+            <div id="total-vol" class="value">0</div>
+            <div style="font-size: 0.8em; color: #666;">Impacto unificado acumulado</div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-box"><div id="chart-participacion-anual"></div><div id="obs-participacion" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-cierre-mes"></div><div id="obs-cierre" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-facturas-doble-eje"></div><div id="obs-facturas" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-motivos"></div><div id="obs-motivos" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-productos"></div><div id="obs-productos" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-responsables"></div><div id="obs-responsables" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-estados"></div><div id="obs-estados" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-flota"></div><div id="obs-flota" class="insight"></div></div>
+    </div>
+
+    <script>
+        const URL_DES = "https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/main/despachos.csv";
+        const URL_DEV = "https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/main/devoluciones.csv";
+
+        let BD_DESPACHOS = [];
+        let BD_DEVOLUCIONES = [];
+        const nombreMeses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+
+        async function inicializar() {
+            try {
+                const [rDes, rDev] = await Promise.all([
+                    fetch(URL_DES).then(res => res.text()),
+                    fetch(URL_DEV).then(res => res.text())
+                ]);
+
+                const normalizar = (h) => h.trim().toUpperCase();
+
+                BD_DESPACHOS = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizar}).data;
+                
+                let rawDev = rDev.trim();
+                if (rawDev.startsWith("1,2,3") || rawDev.startsWith("1;2;3")) {
+                    rawDev = rawDev.substring(rawDev.indexOf("\n") + 1);
+                }
+                BD_DEVOLUCIONES = Papa.parse(rawDev, {header:true, skipEmptyLines:true, transformHeader: normalizar}).data;
+
+                const selectorA = document.getElementById('mesA');
+                const selectorB = document.getElementById('mesB');
+                
+                nombreMeses.forEach((m, idx) => {
+                    selectorA.add(new Option(m, idx + 1));
+                    selectorB.add(new Option(m, idx + 1));
+                });
+
+                selectorA.value = 5; // Por defecto Mayo
+                selectorB.value = 6; // Por defecto Junio
+
+                actualizarDashboard();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').innerText = "Error leyendo archivos. Verifica nombres en GitHub.";
+            }
+        }
+
+        function actualizarDashboard() {
+            const mesA = parseInt(document.getElementById('mesA').value);
+            const mesB = parseInt(document.getElementById('mesB').value);
+
+            document.getElementById('titulo-kpi-A').innerText = `% Devolución ${nombreMeses[mesA-1]}`;
+            document.getElementById('titulo-kpi-B').innerText = `% Devolución ${nombreMeses[mesB-1]}`;
+
             const desMesA = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesA || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesA-1]);
             const desMesB = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesB || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesB-1]);
 
-            // Despachos totales (Ventas) para el cálculo del % de efectividad global
             const cajasDespA = parseFloat(desMesA ? (desMesA['CAJAS DESPACHADAS'] || desMesA['TOTAL CAJAS'] || 0) : 0);
             const cajasDespB = parseFloat(desMesB ? (desMesB['CAJAS DESPACHADAS'] || desMesB['TOTAL CAJAS'] || 0) : 0);
 
-            // Filtrado estricto por mes de la base de devoluciones
             const devMesA = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesA);
             const devMesB = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesB);
             const devAnual = BD_DEVOLUCIONES.filter(r => (r['FECHA FACT.'] || '').toString().includes('2026'));
 
             const granTotalDevAnual = devAnual.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0) || 1;
             
-            // Suma real de CAJAS DEVUELTAS físicas de cada mes
+            // Sumas reales de las cajas físicas devueltas
             const cajasDevA = devMesA.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
             const cajasDevB = devMesB.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
 
-            // % de Efectividad respecto al despacho (Meta 1%)
             const pA = cajasDespA > 0 ? (cajasDevA / cajasDespA) * 100 : 0;
             const pB = cajasDespB > 0 ? (cajasDevB / cajasDespB) * 100 : 0;
 
-            // ASIGNACIÓN CORRECTA A TARJETAS KPI (Espejo de tu Excel)
             document.getElementById('perc-cajas-A').innerText = pA.toFixed(2) + "%";
             document.getElementById('perc-cajas-B').innerText = pB.toFixed(2) + "%";
             
-            // CORRECCIÓN SARTURACIÓN: Ahora muestra la suma real de CAJAS DEVUELTAS de ambos meses (Ej: 2,045)
+            // KPI asignados correctamente según volumen de devoluciones reales
+            document.getElementById('kpi-cajas-A-solo').innerText = Math.round(cajasDevA).toLocaleString();
             document.getElementById('total-vol').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
-            document.getElementById('total-dev').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
 
             document.getElementById('card-cajas-A').className = pA > 1 ? 'card critico' : 'card';
             document.getElementById('card-cajas-B').className = pB > 1 ? 'card critico' : 'card';
@@ -112,8 +232,9 @@
             });
             document.getElementById('obs-productos').innerHTML = `El SKU de mayor impacto negativo es <b>${[...topProds].reverse()[0] || 'N/A'}</b>.`;
 
+
             // ==========================================
-            // CORRECCIÓN BLOQUE 1: GRÁFICAS 6 Y 7 COMPLETAS
+            // BLOQUE CORREGIDO: GRÁFICAS 6 Y 7 CON TOTAL CONTROL
             // ==========================================
 
             // 6. Top 6 Responsables (Frecuencia Absoluta TOTAL CONTROL)
@@ -121,7 +242,7 @@
             devAmbosMeses.forEach(r => { 
                 let re = (r['RESPONSABLE'] || '').toString().trim().toUpperCase();
                 if(re && re !== '0' && re !== 'S/D' && re !== '') { 
-                    respMap[re] = (respMap[re] || 0) + 1; // Conteo de filas exacto de Excel
+                    respMap[re] = (respMap[re] || 0) + 1; // Cuenta exacta de incidencias de Excel
                 }
             });
             let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
@@ -147,7 +268,7 @@
             devAmbosMeses.forEach(r => { 
                 let e = (r['ESTADO'] || '').toString().trim().toUpperCase();
                 if(e && e !== '0' && e !== 'S/D' && e !== '') { 
-                    edoMap[e] = (edoMap[e] || 0) + 1; // Conteo de filas exacto de Excel
+                    edoMap[e] = (edoMap[e] || 0) + 1; // Cuenta exacta de incidencias de Excel
                 }
             });
             let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0).sort((a,b) => edoMap[b] - edoMap[a]).slice(0,6);
@@ -167,3 +288,30 @@
                 showlegend: false 
             });
             document.getElementById('obs-estados').innerHTML = `El territorio con mayor frecuencia de reclamos es <b>${edosLabels[0] || 'N/A'}</b>.`;
+
+
+            // 8. Flota
+            let transMap = {}, chofMap = {};
+            devAmbosMeses.forEach(r => {
+                let t = (r['TRANSPORTE'] || '').toString().trim(); 
+                let c = (r['CHOFER'] || '').toString().trim();
+                if(t && t !== '0') transMap[t] = (transMap[t] || 0) + 1;
+                if(c && c !== '0') chofMap[c] = (chofMap[c] || 0) + 1;
+            });
+            let topTrans = Object.keys(transMap).reduce((x,y) => transMap[x] > transMap[y] ? x : y, "N/A");
+            let topChof = Object.keys(chofMap).reduce((x,y) => chofMap[x] > chofMap[y] ? x : y, "N/A");
+
+            Plotly.newPlot('chart-flota', [{
+                x: ['Línea Transporte', 'Operador Chofer'], y: [transMap[topTrans] || 0, chofMap[topChof] || 0], type: 'bar', marker: {color: '#e67e22'}, text: [topTrans, topChof], textposition: 'auto'
+            }], { 
+                title: 'Rendimiento Crítico de Flota', margin: { l: 50, r: 40, t: 50, b: 50 }, xaxis: { automargin: true }, yaxis: { automargin: true }
+            });
+            document.getElementById('obs-flota').innerHTML = `<strong>Línea Alerta:</strong> <b>${topTrans}</b> | <strong>Chofer Alerta:</strong> <b>${topChof}</b>.`;
+
+            document.getElementById('status').innerText = "Dashboard Sincronizado: " + new Date().toLocaleTimeString();
+        }
+
+        window.onload = inicializar;
+    </script>
+</body>
+</html>
