@@ -229,12 +229,13 @@
             });
             document.getElementById('obs-productos').innerHTML = `El SKU de mayor impacto negativo es <b>${[...topProds].reverse()[0] || 'N/A'}</b>.`;
 
-           // 6. Distribución por Responsable (Corregido y sin leyendas externas)
+           // 6. Distribución por Responsable (Ajustado a TOTAL CONTROL de Excel)
             let respMap = {};
             devAmbosMeses.forEach(r => { 
                 let re = (r['RESPONSABLE'] || '').toString().trim().toUpperCase();
                 if(re && re !== '0' && re !== 'S/D' && re !== '') { 
-                    respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); 
+                    // Sumamos 1 por cada registro para simular el TOTAL CONTROL (conteo de filas) de Excel
+                    respMap[re] = (respMap[re] || 0) + 1; 
                 }
             });
             let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]);
@@ -244,23 +245,25 @@
                 labels: topResp, 
                 values: respValues, 
                 type: 'pie', 
-                hole: 0.45, // Estilo dona para simular volumen y profundidad
+                hole: 0.45, // Efecto dona/volumen interactivo
                 textinfo: 'label+percent', 
                 textposition: 'inside',
                 marker: { line: { color: '#ffffff', width: 2 } }
             }], { 
-                title: 'Distribución por Responsable de la Falla', 
-                margin: { l: 20, r: 20, t: 50, b: 50 }, 
+                title: 'Distribución por Responsable (Frecuencia TOTAL CONTROL)', 
+                margin: { l: 30, r: 30, t: 50, b: 50 }, 
                 showlegend: false 
             });
             document.getElementById('obs-responsables').innerHTML = `El área con mayor volumen de fallas operativas asignadas es <b>${topResp[0] || 'N/A'}</b>.`;
 
-            // 7. Distribución por Estado Geográfico (Corregido y sin leyendas externas)
+
+            // 7. Distribución por Estado Geográfico (Ajustado a TOTAL CONTROL de Excel)
             let edoMap = {};
             devAmbosMeses.forEach(r => { 
                 let e = (r['ESTADO'] || '').toString().trim().toUpperCase();
                 if(e && e !== '0' && e !== 'S/D' && e !== '') { 
-                    edoMap[e] = (edoMap[e] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); 
+                    // Sumamos 1 por cada registro para reflejar el conteo de filas de Excel
+                    edoMap[e] = (edoMap[e] || 0) + 1; 
                 }
             });
             let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0).sort((a,b) => edoMap[b] - edoMap[a]);
@@ -270,16 +273,16 @@
                 labels: edosLabels, 
                 values: edosValues, 
                 type: 'pie', 
-                hole: 0.45,
+                hole: 0.45, 
                 textinfo: 'label+percent', 
                 textposition: 'inside',
                 marker: { line: { color: '#ffffff', width: 2 } }
             }], { 
-                title: '% Devoluciones por Estado Geográfico', 
-                margin: { l: 20, r: 20, t: 50, b: 50 }, 
+                title: '% Devoluciones por Estado Geográfico (TOTAL CONTROL)', 
+                margin: { l: 30, r: 30, t: 50, b: 50 }, 
                 showlegend: false 
             });
-            document.getElementById('obs-estados').innerHTML = `La región comercial con mayor concentración de incidencias es <b>${edosLabels[edosValues.indexOf(Math.max(...edosValues))] || 'N/A'}</b>.`;
+            document.getElementById('obs-estados').innerHTML = `La región comercial con mayor concentración de incidencias es <b>${edosLabels[0] || 'N/A'}</b>.`;
             // 8. Flota
             let transMap = {}, chofMap = {};
             devAmbosMeses.forEach(r => {
