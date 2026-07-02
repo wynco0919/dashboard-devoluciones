@@ -169,7 +169,7 @@
                 xaxis: { automargin: true },
                 yaxis: { automargin: true }
             });
-            document.getElementById('obs-participacion').innerHTML = `El mes ${nombreMeses[mesB-1]} representa el <b>${porcB.toFixed(1)}%</b> de todas las devoluciones del año.`;
+            document.getElementById('obs-participacion').innerHTML = `El mes ${nombreMeses[mesB-1]} represents el <b>${porcB.toFixed(1)}%</b> de todas las devoluciones del año.`;
 
             // 2. Efecto Cierre de Mes (Mapeado a la columna COMENTARIOS)
             let normalCajas = 0, cierreCajas = 0;
@@ -198,7 +198,7 @@
 
             Plotly.newPlot('chart-facturas-doble-eje', [
                 { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [factDespA, factDespB], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
-                { x: [nombreMeses[mesA-1], fontColor: '#e74c3c', name: '% Rechazo Facturas', y: [porcFactA, porcFactB], yaxis: 'y2', type: 'scatter', mode: 'lines+markers', line: {color: '#e74c3c', width:3} }
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcFactA, porcFactB], name: '% Rechazo Facturas', yaxis: 'y2', type: 'scatter', mode: 'lines+markers', line: {color: '#e74c3c', width:3} }
             ], {
                 title: 'Facturas Totales vs % Devolución',
                 margin: { l: 60, r: 60, t: 50, b: 60 },
@@ -268,4 +268,17 @@
             Plotly.newPlot('chart-flota', [{
                 x: ['Línea Transporte', 'Operador Chofer'], y: [transMap[topTrans] || 0, chofMap[topChof] || 0], type: 'bar', marker: {color: '#e67e22'}, text: [topTrans, topChof], textposition: 'auto'
             }], { 
-                title:
+                title: 'Rendimiento Crítico de Flota',
+                margin: { l: 50, r: 40, t: 50, b: 50 },
+                xaxis: { automargin: true },
+                yaxis: { automargin: true }
+            });
+            document.getElementById('obs-flota').innerHTML = `<strong>Línea Alerta:</strong> <b>${topTrans}</b> | <strong>Chofer Alerta:</strong> <b>${topChof}</b>.`;
+
+            document.getElementById('status').innerText = "Dashboard Sincronizado: " + new Date().toLocaleTimeString();
+        }
+
+        window.onload = inicializar;
+    </script>
+</body>
+</html>
