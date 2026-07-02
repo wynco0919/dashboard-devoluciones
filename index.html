@@ -30,46 +30,43 @@
 
     <div class="selector-box">
         <div>
-            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
+            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Seleccionado:</label>
             <select id="mesA" onchange="actualizarDashboard()"></select>
         </div>
-        <div>
-            <label for="mesB" style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
-            <select id="mesB" onchange="actualizarDashboard()"></select>
-        </div>
+        <div style="display:none;"><select id="mesB"></select></div>
     </div>
 
     <div class="grid-kpis">
         <div class="card" id="card-cajas-A">
-            <h3 id="titulo-kpi-A">% Devolución Mes A</h3>
+            <h3 id="titulo-kpi-A">% Devolución del Mes</h3>
             <div id="perc-cajas-A" class="value">0.00%</div>
             <div style="font-size: 0.8em; color: #666;">Meta de Gestión: Máx 1.00%</div>
         </div>
-        <div class="card" id="card-cajas-B">
-            <h3 id="titulo-kpi-B">% Devolución Mes B</h3>
-            <div id="perc-cajas-B" class="value">0.00%</div>
-            <div id="trend-comparativo" class="trend">--</div>
+        <div class="card">
+            <h3>Total Cajas Despachadas</h3>
+            <div id="kpi-despachadas" class="value">0</div>
+            <div style="font-size: 0.8em; color: #666;">Ventas totales en el mes</div>
         </div>
         <div class="card">
-            <h3>Cajas Devueltas (Mes Base A)</h3>
+            <h3>Total Cajas Devueltas</h3>
             <div id="kpi-cajas-A-solo" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Volumen físico devuelto en A</div>
+            <div style="font-size: 0.8em; color: #666;">Volumen físico devuelto (Suma de Cajas)</div>
         </div>
         <div class="card">
-            <h3>Total Cajas Devueltas (A + B)</h3>
+            <h3>Total Incidencias (Control)</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Impacto unificado acumulado</div>
+            <div style="font-size: 0.8em; color: #666;">Número de filas de incidencias evaluadas</div>
         </div>
     </div>
 
     <div class="charts-grid">
+        <div class="chart-box"><div id="chart-responsables"></div><div id="obs-responsables" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-estados"></div><div id="obs-estados" class="insight"></div></div>
         <div class="chart-box"><div id="chart-participacion-anual"></div><div id="obs-participacion" class="insight"></div></div>
         <div class="chart-box"><div id="chart-cierre-mes"></div><div id="obs-cierre" class="insight"></div></div>
         <div class="chart-box"><div id="chart-facturas-doble-eje"></div><div id="obs-facturas" class="insight"></div></div>
         <div class="chart-box"><div id="chart-motivos"></div><div id="obs-motivos" class="insight"></div></div>
         <div class="chart-box"><div id="chart-productos"></div><div id="obs-productos" class="insight"></div></div>
-        <div class="chart-box"><div id="chart-responsables"></div><div id="obs-responsables" class="insight"></div></div>
-        <div class="chart-box"><div id="chart-estados"></div><div id="obs-estados" class="insight"></div></div>
         <div class="chart-box"><div id="chart-flota"></div><div id="obs-flota" class="insight"></div></div>
     </div>
 
@@ -99,16 +96,11 @@
                 BD_DEVOLUCIONES = Papa.parse(rawDev, {header:true, skipEmptyLines:true, transformHeader: normalizar}).data;
 
                 const selectorA = document.getElementById('mesA');
-                const selectorB = document.getElementById('mesB');
-                
                 nombreMeses.forEach((m, idx) => {
                     selectorA.add(new Option(m, idx + 1));
-                    selectorB.add(new Option(m, idx + 1));
                 });
 
-                selectorA.value = 5; // Por defecto Mayo
-                selectorB.value = 6; // Por defecto Junio
-
+                selectorA.value = 5; // Inicia en Mayo por defecto para contrastar de inmediato
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
@@ -118,131 +110,37 @@
 
         function actualizarDashboard() {
             const mesA = parseInt(document.getElementById('mesA').value);
-            const mesB = parseInt(document.getElementById('mesB').value);
 
             document.getElementById('titulo-kpi-A').innerText = `% Devolución ${nombreMeses[mesA-1]}`;
-            document.getElementById('titulo-kpi-B').innerText = `% Devolución ${nombreMeses[mesB-1]}`;
 
             const desMesA = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesA || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesA-1]);
-            const desMesB = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesB || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesB-1]);
-
             const cajasDespA = parseFloat(desMesA ? (desMesA['CAJAS DESPACHADAS'] || desMesA['TOTAL CAJAS'] || 0) : 0);
-            const cajasDespB = parseFloat(desMesB ? (desMesB['CAJAS DESPACHADAS'] || desMesB['TOTAL CAJAS'] || 0) : 0);
 
             const devMesA = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesA);
-            const devMesB = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesB);
             const devAnual = BD_DEVOLUCIONES.filter(r => (r['FECHA FACT.'] || '').toString().includes('2026'));
 
             const granTotalDevAnual = devAnual.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0) || 1;
-            
-            // Sumas reales de las cajas físicas devueltas
             const cajasDevA = devMesA.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
-            const cajasDevB = devMesB.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
 
             const pA = cajasDespA > 0 ? (cajasDevA / cajasDespA) * 100 : 0;
-            const pB = cajasDespB > 0 ? (cajasDevB / cajasDespB) * 100 : 0;
 
             document.getElementById('perc-cajas-A').innerText = pA.toFixed(2) + "%";
-            document.getElementById('perc-cajas-B').innerText = pB.toFixed(2) + "%";
-            
-            // KPI asignados correctamente según volumen de devoluciones reales
+            document.getElementById('kpi-despachadas').innerText = Math.round(cajasDespA).toLocaleString();
             document.getElementById('kpi-cajas-A-solo').innerText = Math.round(cajasDevA).toLocaleString();
-            document.getElementById('total-vol').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
+            document.getElementById('total-vol').innerText = devMesA.length.toLocaleString(); 
 
             document.getElementById('card-cajas-A').className = pA > 1 ? 'card critico' : 'card';
-            document.getElementById('card-cajas-B').className = pB > 1 ? 'card critico' : 'card';
 
-            const variacion = pB - pA;
-            if(variacion > 0) {
-                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--danger)">▲ Desmejora de ${variacion.toFixed(2)}%</span> respecto a ${nombreMeses[mesA-1]}`;
-            } else {
-                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--accent)">▼ Mejora de ${Math.abs(variacion).toFixed(2)}%</span> respecto a ${nombreMeses[mesA-1]}`;
-            }
+            // ====================================================================
+            // 🛠️ BLOQUE 1 PERFECCIONADO: GRÁFICA DE RESPONSABLES Y ESTADOS (TOP 6)
+            // ====================================================================
 
-            const devAmbosMeses = [...devMesA, ...devMesB];
-
-            // 1. Participación Anual
-            const porcA = (cajasDevA / granTotalDevAnual) * 100;
-            const porcB = (cajasDevB / granTotalDevAnual) * 100;
-            Plotly.newPlot('chart-participacion-anual', [{
-                x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcA, porcB], type: 'bar', marker: {color: '#34495e'}, text: [porcA.toFixed(1)+'%', porcB.toFixed(1)+'%'], textposition: 'auto'
-            }], { 
-                title: '% Representación vs Total Devuelto 2026',
-                margin: { l: 50, r: 40, t: 50, b: 60 }, xaxis: { automargin: true }, yaxis: { automargin: true }
-            });
-            document.getElementById('obs-participacion').innerHTML = `El mes ${nombreMeses[mesB-1]} representa el <b>${porcB.toFixed(1)}%</b> del acumulado total anual.`;
-
-            // 2. Efecto Cierre de Mes
-            let normalCajas = 0, cierreCajas = 0;
-            devAmbosMeses.forEach(r => {
-                const comentario = (r['COMENTARIOS'] || '').toString().toUpperCase();
-                const cant = parseFloat(r['CANT CAJA DEV'] || 0);
-                if(comentario.includes('FIN DE MES')) cierreCajas += cant;
-                else normalCajas += cant;
-            });
-            Plotly.newPlot('chart-cierre-mes', [{
-                labels: ['Venta Normal', 'Venta Fin de Mes'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4, marker: {colors: ['#003366', '#e74c3c']}
-            }], { 
-                title: 'Comportamiento Cierre (Aglomeración)',
-                margin: { l: 40, r: 40, t: 50, b: 60 }, legend: { orientation: 'h', y: -0.15 }
-            });
-            document.getElementById('obs-cierre').innerHTML = `El periodo de cierre concentra el <b>${((cierreCajas/(normalCajas+cierreCajas || 1))*100).toFixed(1)}%</b> del volumen evaluado.`;
-
-            // 3. Eje Secundario
-            const factDespA = parseFloat(desMesA ? (desMesA['FACTURAS DESPACHADAS'] || 0) : 0);
-            const factDespB = parseFloat(desMesB ? (desMesB['FACTURAS DESPACHADAS'] || 0) : 0);
-            const factDevA = parseFloat(desMesA ? (desMesA['FACTURAS DEVUELTAS'] || 0) : 0);
-            const factDevB = parseFloat(desMesB ? (desMesB['FACTURAS DEVUELTAS'] || 0) : 0);
-            const porcFactA = factDespA > 0 ? (factDevA / factDespA) * 100 : 0;
-            const porcFactB = factDespB > 0 ? (factDevB / factDespB) * 100 : 0;
-
-            Plotly.newPlot('chart-facturas-doble-eje', [
-                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [factDespA, factDespB], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
-                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcFactA, porcFactB], name: '% Rechazo Facturas', yaxis: 'y2', type: 'scatter', mode: 'lines+markers', line: {color: '#e74c3c', width:3} }
-            ], {
-                title: 'Facturas Totales vs % Devolución',
-                margin: { l: 60, r: 60, t: 50, b: 60 },
-                yaxis: {title: 'Volumen Facturas', automargin: true},
-                yaxis2: {title: '% Rechazo', titlefont: {color: '#e74c3c'}, tickfont: {color: '#e74c3c'}, overlaying: 'y', side: 'right', automargin: true},
-                legend: { orientation: 'h', y: -0.15 }
-            });
-            document.getElementById('obs-facturas').innerHTML = `El porcentaje de facturas rechazadas en el periodo B es <b>${porcFactB.toFixed(2)}%</b>.`;
-
-            // 4. Top 6 Motivos
-            let motMap = {};
-            devAmbosMeses.forEach(r => { 
-                let m = (r['MOTIVO'] || '').toString().trim();
-                if(m && m !== '0') { motMap[m] = (motMap[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); }
-            });
-            let topMotivos = Object.keys(motMap).filter(m => motMap[m] > 0).sort((a,b) => motMap[b] - motMap[a]).slice(0,6).reverse();
-            Plotly.newPlot('chart-motivos', [{ y: topMotivos, x: topMotivos.map(m => motMap[m]), type: 'bar', orientation: 'h', marker: {color: '#2c3e50'} }], { 
-                title: 'Top 6 Motivos de Devolución', margin: { l: 180, r: 30, t: 50, b: 50 }, xaxis: { automargin: true }, yaxis: { automargin: true }
-            });
-            document.getElementById('obs-motivos').innerHTML = `Causa crítica del periodo evaluado: <b>${[...topMotivos].reverse()[0] || 'N/A'}</b>.`;
-
-            // 5. Cajas por Producto
-            let prodMap = {};
-            devAmbosMeses.forEach(r => { 
-                let p = (r['PRODUCTO'] || '').toString().trim();
-                if(p && p !== '0') { prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); }
-            });
-            let topProds = Object.keys(prodMap).filter(p => prodMap[p] > 0).sort((a,b) => prodMap[b] - prodMap[a]).slice(0,5).reverse();
-            Plotly.newPlot('chart-productos', [{ y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', marker: {color: '#d35400'} }], { 
-                title: 'Cajas Devueltas por Producto (Top 5)', margin: { l: 250, r: 30, t: 50, b: 50 }, xaxis: { automargin: true }, yaxis: { automargin: true }
-            });
-            document.getElementById('obs-productos').innerHTML = `El SKU de mayor impacto negativo es <b>${[...topProds].reverse()[0] || 'N/A'}</b>.`;
-
-
-            // ==========================================
-            // BLOQUE CORREGIDO: GRÁFICAS 6 Y 7 CON TOTAL CONTROL
-            // ==========================================
-
-            // 6. Top 6 Responsables (Frecuencia Absoluta TOTAL CONTROL)
+            // 6. Gráfica Responsables: Suma de Cajas Dividido entre el Total de Cajas
             let respMap = {};
-            devAmbosMeses.forEach(r => { 
+            devMesA.forEach(r => { 
                 let re = (r['RESPONSABLE'] || '').toString().trim().toUpperCase();
                 if(re && re !== '0' && re !== 'S/D' && re !== '') { 
-                    respMap[re] = (respMap[re] || 0) + 1; // Cuenta exacta de incidencias de Excel
+                    respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); 
                 }
             });
             let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
@@ -252,23 +150,24 @@
                 labels: topResp, 
                 values: respValues, 
                 type: 'pie', 
-                hole: 0.45, 
+                hole: 0.4, 
                 textinfo: 'label+percent', 
                 textposition: 'inside',
+                insidetextorientation: 'radial',
                 marker: { line: { color: '#ffffff', width: 2 } }
             }], { 
-                title: 'Top 6 Responsables (TOTAL CONTROL)', 
-                margin: { l: 30, r: 30, t: 50, b: 50 }, 
-                showlegend: false 
+                title: 'Top 6 Responsables (Volumen de Cajas Devueltas)', 
+                margin: { l: 20, r: 20, t: 60, b: 40 }, 
+                showlegend: false
             });
-            document.getElementById('obs-responsables').innerHTML = `El área con mayor cantidad de incidencias registradas es <b>${topResp[0] || 'N/A'}</b>.`;
+            document.getElementById('obs-responsables').innerHTML = `El área asignada con mayor volumen físico de cajas en el mes evaluado es <b>${topResp[0] || 'N/A'}</b>.`;
 
-            // 7. Top 6 Distribución por Estado Geográfico (Frecuencia Absoluta TOTAL CONTROL)
+            // 7. Gráfica Estados: TOTAL CONTROL (Conteo) dividido entre el Total de Incidencias
             let edoMap = {};
-            devAmbosMeses.forEach(r => { 
+            devMesA.forEach(r => { 
                 let e = (r['ESTADO'] || '').toString().trim().toUpperCase();
                 if(e && e !== '0' && e !== 'S/D' && e !== '') { 
-                    edoMap[e] = (edoMap[e] || 0) + 1; // Cuenta exacta de incidencias de Excel
+                    edoMap[e] = (edoMap[e] || 0) + 1; 
                 }
             });
             let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0).sort((a,b) => edoMap[b] - edoMap[a]).slice(0,6);
@@ -278,35 +177,66 @@
                 labels: edosLabels, 
                 values: edosValues, 
                 type: 'pie', 
-                hole: 0.45, 
+                hole: 0.4, 
                 textinfo: 'label+percent', 
                 textposition: 'inside',
+                insidetextorientation: 'radial',
                 marker: { line: { color: '#ffffff', width: 2 } }
             }], { 
                 title: 'Top 6 Estados con Mayor Incidencia (TOTAL CONTROL)', 
-                margin: { l: 20, r: 20, t: 50, b: 50 }, 
-                showlegend: false 
+                margin: { l: 20, r: 20, t: 60, b: 40 }, 
+                showlegend: false
             });
             document.getElementById('obs-estados').innerHTML = `El territorio con mayor frecuencia de reclamos es <b>${edosLabels[0] || 'N/A'}</b>.`;
 
 
+            // --- OTRAS GRÁFICAS DEL TABLERO EN ESPERA DE REVISIÓN ---
+            // 1. Participación Anual
+            const porcA = (cajasDevA / granTotalDevAnual) * 100;
+            Plotly.newPlot('chart-participacion-anual', [{
+                x: [nombreMeses[mesA-1]], y: [porcA], type: 'bar', marker: {color: '#34495e'}, text: [porcA.toFixed(1)+'%'], textposition: 'auto'
+            }], { title: '% Representación vs Total Anual', margin: { l: 50, r: 40, t: 50, b: 60 } });
+
+            // 2. Cierre de Mes
+            let normalCajas = 0, cierreCajas = 0;
+            devMesA.forEach(r => {
+                const comentario = (r['COMENTARIOS'] || '').toString().toUpperCase();
+                if(comentario.includes('FIN DE MES')) cierreCajas += parseFloat(r['CANT CAJA DEV'] || 0);
+                else normalCajas += parseFloat(r['CANT CAJA DEV'] || 0);
+            });
+            Plotly.newPlot('chart-cierre-mes', [{ labels: ['Venta Normal', 'Venta Fin de Mes'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4 }], { title: 'Comportamiento Cierre', legend: { orientation: 'h', y: -0.15 } });
+
+            // 3. Eje Secundario
+            const factDespA = parseFloat(desMesA ? (desMesA['FACTURAS DESPACHADAS'] || 0) : 0);
+            const factDevA = parseFloat(desMesA ? (desMesA['FACTURAS DEVUELTAS'] || 0) : 0);
+            const porcFactA = factDespA > 0 ? (factDevA / factDespA) * 100 : 0;
+            Plotly.newPlot('chart-facturas-doble-eje', [
+                { x: [nombreMeses[mesA-1]], y: [factDespA], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
+                { x: [nombreMeses[mesA-1]], y: [porcFactA], name: '% Rechazo', yaxis: 'y2', type: 'scatter', mode: 'lines+markers' }
+            ], { yaxis: {title: 'Volumen'}, yaxis2: {overlaying: 'y', side: 'right'} });
+
+            // 4. Motivos
+            let motMap = {};
+            devMesA.forEach(r => { let m = (r['MOTIVO'] || '').toString().trim(); if(m && m !== '0') { motMap[m] = (motMap[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
+            let topM = Object.keys(motMap).sort((a,b) => motMap[b] - motMap[a]).slice(0,6).reverse();
+            Plotly.newPlot('chart-motivos', [{ y: topM, x: topM.map(m => motMap[m]), type: 'bar', orientation: 'h' }], { title: 'Top 6 Motivos', margin: { l: 150 } });
+
+            // 5. Productos
+            let prodMap = {};
+            devMesA.forEach(r => { let p = (r['PRODUCTO'] || '').toString().trim(); if(p && p !== '0') { prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
+            let topP = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0,5).reverse();
+            Plotly.newPlot('chart-productos', [{ y: topP, x: topP.map(p => prodMap[p]), type: 'bar', orientation: 'h' }], { title: 'Top 5 Productos', margin: { l: 200 } });
+
             // 8. Flota
             let transMap = {}, chofMap = {};
-            devAmbosMeses.forEach(r => {
-                let t = (r['TRANSPORTE'] || '').toString().trim(); 
-                let c = (r['CHOFER'] || '').toString().trim();
+            devMesA.forEach(r => {
+                let t = (r['TRANSPORTE'] || '').toString().trim(); let c = (r['CHOFER'] || '').toString().trim();
                 if(t && t !== '0') transMap[t] = (transMap[t] || 0) + 1;
                 if(c && c !== '0') chofMap[c] = (chofMap[c] || 0) + 1;
             });
             let topTrans = Object.keys(transMap).reduce((x,y) => transMap[x] > transMap[y] ? x : y, "N/A");
             let topChof = Object.keys(chofMap).reduce((x,y) => chofMap[x] > chofMap[y] ? x : y, "N/A");
-
-            Plotly.newPlot('chart-flota', [{
-                x: ['Línea Transporte', 'Operador Chofer'], y: [transMap[topTrans] || 0, chofMap[topChof] || 0], type: 'bar', marker: {color: '#e67e22'}, text: [topTrans, topChof], textposition: 'auto'
-            }], { 
-                title: 'Rendimiento Crítico de Flota', margin: { l: 50, r: 40, t: 50, b: 50 }, xaxis: { automargin: true }, yaxis: { automargin: true }
-            });
-            document.getElementById('obs-flota').innerHTML = `<strong>Línea Alerta:</strong> <b>${topTrans}</b> | <strong>Chofer Alerta:</strong> <b>${topChof}</b>.`;
+            Plotly.newPlot('chart-flota', [{ x: ['Transporte', 'Chofer'], y: [transMap[topTrans] || 0, chofMap[topChof] || 0], text: [topTrans, topChof], textposition: 'auto' }], { title: 'Control de Flota' });
 
             document.getElementById('status').innerText = "Dashboard Sincronizado: " + new Date().toLocaleTimeString();
         }
