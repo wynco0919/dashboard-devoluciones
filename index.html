@@ -2,168 +2,288 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Wynco | Dashboard Gerencial 2026</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <title>Wynco | Dashboard Gerencial de Devoluciones 2026</title>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         :root { --primary: #003366; --accent: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; --dark: #2c3e50; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--dark); }
         .header { background: var(--primary); color: white; padding: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; }
+        .selector-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 20px; align-items: center; }
+        select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; color: var(--dark); font-weight: bold; }
+        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; }
         .card.critico { border-top-color: var(--danger); background: #fff5f5; }
-        .value { font-size: 2.3em; font-weight: bold; margin: 8px 0; color: var(--primary); }
-        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; }
-        .chart-box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; }
+        .value { font-size: 1.9em; font-weight: bold; margin: 8px 0; color: var(--primary); }
+        .trend { font-size: 0.9em; font-weight: bold; margin-top: 5px; }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 20px; }
+        .chart-box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 400px; }
         .insight { background: #eef2f7; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); font-weight: 500; }
     </style>
 </head>
 <body>
+
     <div class="header">
-        <h1>Wynco: Reporte Operativo de Devoluciones (Año 2026)</h1>
-        <div id="status">Iniciando lectura de datos...</div>
+        <h1>Wynco: Inteligencia Operativa de Devoluciones</h1>
+        <div id="status">Iniciando lectura de repositorios...</div>
+    </div>
+
+    <div class="selector-box">
+        <div>
+            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
+            <select id="mesA" onchange="actualizarDashboard()"></select>
+        </div>
+        <div>
+            <label for="mesB" style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
+            <select id="mesB" onchange="actualizarDashboard()"></select>
+        </div>
+        <div style="font-size: 0.9em; color: #555; font-style: italic;">Cambia los meses para recalcular el impacto inmediato.</div>
     </div>
 
     <div class="grid-kpis">
-        <div class="card" id="card-cajas">
-            <h3>% Devolución Global (2026)</h3>
-            <div id="perc-cajas" class="value">0%</div>
-            <div style="font-size: 0.85em; color: #666;">Umbral Máximo Tol.: 3.00%</div>
+        <div class="card" id="card-cajas-A">
+            <h3 id="titulo-kpi-A">% Devolución Mes A</h3>
+            <div id="perc-cajas-A" class="value">0.00%</div>
+            <div style="font-size: 0.8em; color: #666;">Meta Máxima: 1.00%</div>
+        </div>
+        <div class="card" id="card-cajas-B">
+            <h3 id="titulo-kpi-B">% Devolución Mes B</h3>
+            <div id="perc-cajas-B" class="value">0.00%</div>
+            <div id="trend-comparativo" class="trend">--</div>
         </div>
         <div class="card">
-            <h3>Total Cajas Despachadas</h3>
+            <h3>Cajas Procesadas (Suma)</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.85em; color: #666;">Volumen en Distribución 2026</div>
+            <div style="font-size: 0.8em; color: #666;">Despacho unificado de ambos meses</div>
         </div>
         <div class="card">
             <h3>Total Cajas Devueltas</h3>
             <div id="total-dev" class="value">0</div>
-            <div style="font-size: 0.85em; color: #666;">Total Producto Retornado</div>
+            <div style="font-size: 0.8em; color: #666;">Acumulado físico devuelto</div>
         </div>
     </div>
 
     <div class="charts-grid">
-        <div class="chart-box">
-            <div id="chart-meses"></div>
-            <div id="obs-meses" class="insight"></div>
+        <div id="box-meses" class="chart-box">
+            <div id="chart-participacion-anual"></div>
+            <div id="obs-participacion" class="insight"></div>
         </div>
         <div class="chart-box">
-            <div id="chart-responsables"></div>
-            <div id="obs-responsables" class="insight"></div>
+            <div id="chart-cierre-mes"></div>
+            <div id="obs-cierre" class="insight"></div>
+        </div>
+        <div class="chart-box">
+            <div id="chart-facturas-doble-eje"></div>
+            <div id="obs-facturas" class="insight"></div>
         </div>
         <div class="chart-box">
             <div id="chart-motivos"></div>
             <div id="obs-motivos" class="insight"></div>
         </div>
         <div class="chart-box">
+            <div id="chart-productos"></div>
+            <div id="obs-productos" class="insight"></div>
+        </div>
+        <div class="chart-box">
+            <div id="chart-responsables"></div>
+            <div id="obs-responsables" class="insight"></div>
+        </div>
+        <div class="chart-box">
             <div id="chart-estados"></div>
             <div id="obs-estados" class="insight"></div>
+        </div>
+        <div class="chart-box">
+            <div id="chart-flota"></div>
+            <div id="obs-flota" class="insight"></div>
         </div>
     </div>
 
     <script>
-        const URL_DES = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/despachos.csv";
-        const URL_DEV = "https://raw.githubusercontent.com/wynco0919/graficas-devoluciones/main/devoluciones.csv";
+        const URL_DES = "https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/main/despachos.csv";
+        const URL_DEV = "https://raw.githubusercontent.com/wynco0919/dashboard-devoluciones/main/devoluciones.csv";
 
-        async function cargar() {
+        let BD_DESPACHOS = [];
+        let BD_DEVOLUCIONES = [];
+        const nombreMeses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+
+        async function inicializar() {
             try {
-                document.getElementById('status').innerText = "Conectando con GitHub...";
                 const [rDes, rDev] = await Promise.all([
                     fetch(URL_DES).then(res => res.text()),
                     fetch(URL_DEV).then(res => res.text())
                 ]);
 
-                const normalizarHeaders = (h) => h.trim().toUpperCase();
+                const normalizar = (h) => h.trim().toUpperCase();
 
-                // Intentamos procesar con el motor global de PapaParse
-                if (typeof Papa === 'undefined') {
-                    throw new Error("La librería de lectura no cargó correctamente.");
-                }
-
-                const dDes = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizarHeaders}).data;
+                // Lectura limpia mapeando mayúsculas
+                BD_DESPACHOS = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizar}).data;
                 
-                let rawDevText = rDev.trim();
-                if (rawDevText.startsWith("1,2,3") || rawDevText.startsWith("1;2;3")) {
-                    rawDevText = rawDevText.substring(rawDevText.indexOf("\n") + 1);
+                let rawDev = rDev.trim();
+                if (rawDev.startsWith("1,2,3") || rawDev.startsWith("1;2;3")) {
+                    rawDev = rawDev.substring(rawDev.indexOf("\n") + 1);
                 }
+                BD_DEVOLUCIONES = Papa.parse(rawDev, {header:true, skipEmptyLines:true, transformHeader: normalizar}).data;
 
-                const dDev = Papa.parse(rawDevText, {header:true, skipEmptyLines:true, transformHeader: normalizarHeaders}).data;
+                // Llenar selectores dinámicamente con meses existentes
+                const selectorA = document.getElementById('mesA');
+                const selectorB = document.getElementById('mesB');
+                
+                nombreMeses.forEach((m, idx) => {
+                    let optA = new Option(m, idx + 1);
+                    let optB = new Option(m, idx + 1);
+                    selectorA.add(optA);
+                    selectorB.add(optB);
+                });
 
-                procesar(dDes, dDev);
-                document.getElementById('status').innerText = "Sincronizado: " + new Date().toLocaleTimeString();
-            } catch(e) { 
+                // Inicializar selectores por defecto (Enero vs Febrero)
+                selectorA.value = 1;
+                selectorB.value = 2;
+
+                actualizarDashboard();
+            } catch (e) {
                 console.error(e);
-                document.getElementById('status').innerText = "Falta sincronizar archivos CSV en GitHub.";
+                document.getElementById('status').innerText = "Falta subir o corregir los nombres de los CSV en GitHub.";
             }
         }
 
-        function procesar(des, dev) {
-            // Sumar Despachos 2026
-            const v26 = des.filter(r => r['AÑO'] == "2026")
-                           .reduce((a,b) => a + parseFloat(b['CAJAS DESPACHADAS'] || 0), 0);
+        function actualizarDashboard() {
+            const mesA = parseInt(document.getElementById('mesA').value);
+            const mesB = parseInt(document.getElementById('mesB').value);
 
-            // Filtrar Devoluciones del 2026
-            const dev26 = dev.filter(r => {
-                const f = r['FECHA FACT.'] || r['FECHA REGISTRO2'] || '';
-                return f.toString().includes('2026');
+            document.getElementById('titulo-kpi-A').innerText = `% Devolución ${nombreMeses[mesA-1]}`;
+            document.getElementById('titulo-kpi-B').innerText = `% Devolución ${nombreMeses[mesB-1]}`;
+
+            // --- PROCESAMIENTO DATA 2026 ---
+            // Data anual para calcular participaciones globales
+            const devAnual2026 = BD_DEVOLUCIONES.filter(r => (r['FECHA FACT.'] || r['FECHA REGISTRO2'] || '').toString().includes('2026'));
+            const granTotalDevAnual = devAnual2026.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0) || 1;
+
+            // Filtrados específicos Mes A y Mes B
+            const desMesA = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesA || r['MES'] === nombreMeses[mesA-1]);
+            const desMesB = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesB || r['MES'] === nombreMeses[mesB-1]);
+
+            const cajasDespA = parseFloat(desMesA ? desMesA['CAJAS DESPACHADAS'] : 0);
+            const cajasDespB = parseFloat(desMesB ? desMesB['CAJAS DESPACHADAS'] : 0);
+
+            const devMesA = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesA);
+            const devMesB = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesB);
+
+            const cajasDevA = devMesA.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
+            const cajasDevB = devMesB.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
+
+            // KPIs Porcentuales
+            const pA = cajasDespA > 0 ? (cajasDevA / cajasDespA) * 100 : 0;
+            const pB = cajasDespB > 0 ? (cajasDevB / cajasDespB) * 100 : 0;
+
+            // Mostrar en tarjetas
+            document.getElementById('perc-cajas-A').innerText = pA.toFixed(2) + "%";
+            document.getElementById('perc-cajas-B').innerText = pB.toFixed(2) + "%";
+            document.getElementById('total-vol').innerText = Math.round(cajasDespA + cajasDespB).toLocaleString();
+            document.getElementById('total-dev').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
+
+            // Lógica de alerta por meta del 1%
+            document.getElementById('card-cajas-A').className = pA > 1 ? 'card critico' : 'card';
+            document.getElementById('card-cajas-B').className = pB > 1 ? 'card critico' : 'card';
+
+            // Cálculo de mejora o desmejora
+            const variacion = pB - pA;
+            if(variacion > 0) {
+                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--danger)">▲ Desmejora de ${variacion.toFixed(2)}%</span> respecto al mes base`;
+            } else {
+                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--accent)">▼ Mejora de ${Math.abs(variacion).toFixed(2)}%</span> respecto al mes base`;
+            }
+
+            // --- UNIFICACIÓN DE GRÁFICOS (MES A + MES B COMBINADOS) ---
+            const devAmbosMeses = [...devMesA, ...devMesB];
+
+            // 1. Participación Anual
+            const porcA = (cajasDevA / granTotalDevAnual) * 100;
+            const porcB = (cajasDevB / granTotalDevAnual) * 100;
+            Plotly.newPlot('chart-participacion-anual', [{
+                x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcA, porcB], type: 'bar', marker: {color: '#34495e'}
+            }], { title: '% Representación vs Total Devuelto 2026' });
+            document.getElementById('obs-participacion').innerHTML = `El mes ${nombreMeses[mesB-1]} representa el <b>${porcB.toFixed(1)}%</b> de todas las devoluciones del año.`;
+
+            // 2. Efecto Cierre de Mes (Antes del 28 vs Cierre)
+            let normalCajas = 0, cierreCajas = 0;
+            devAmbosMeses.forEach(r => {
+                const tipo = (r['TIPO_CIERRE'] || '').toString().toUpperCase();
+                const cant = parseFloat(r['CANT CAJA DEV'] || 0);
+                if(tipo.includes('FIN DE MES')) cierreCajas += cant;
+                else normalCajas += cant;
             });
+            Plotly.newPlot('chart-cierre-mes', [{
+                labels: ['Venta Normal (Días 1-27)', 'Venta Fin de Mes (Cierre 28+)'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4, marker: {colors: ['#003366', '#e74c3c']}
+            }], { title: 'Comportamiento Cierre (Aglomeración)' });
+            document.getElementById('obs-cierre').innerHTML = `El periodo de cierre concentra el <b>${((cierreCajas/(normalCajas+cierreCajas || 1))*100).toFixed(1)}%</b> de las quejas unificadas.`;
 
-            let totalCajasDev = 0;
-            const mesMap = {}, respMap = {}, mMap = {}, eMap = {};
-            const nombreMeses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            // 3. Eje Secundario: Facturas Despachadas vs Devueltas
+            const factDespA = parseFloat(desMesA ? desMesA['FACTURAS DESPACHADAS'] : 0);
+            const factDespB = parseFloat(desMesB ? desMesB['FACTURAS DESPACHADAS'] : 0);
+            const factDevA = parseFloat(desMesA ? desMesA['FACTURAS DEVUELTAS'] : 0);
+            const factDevB = parseFloat(desMesB ? desMesB['FACTURAS DEVUELTAS'] : 0);
+            
+            const porcFactA = factDespA > 0 ? (factDevA / factDespA) * 100 : 0;
+            const porcFactB = factDespB > 0 ? (factDevB / factDespB) * 100 : 0;
 
-            dev26.forEach(r => {
-                const cant = parseFloat(r['CANT CAJA DEV'] || r['CAJAS_DEVUELTAS'] || 0);
-                totalCajasDev += cant;
-
-                // Registro por Mes
-                let mIndex = parseInt(r['MES'] || 0);
-                if(mIndex >= 1 && mIndex <= 12) {
-                    const mNombre = nombreMeses[mIndex - 1];
-                    mesMap[mNombre] = (mesMap[mNombre] || 0) + cant;
-                }
-
-                // Registro por Responsable
-                const resp = (r['RESPONSABLE'] || 'S/D').toString().trim().toUpperCase();
-                respMap[resp] = (respMap[resp] || 0) + cant;
-
-                // Registro por Motivo
-                const mot = (r['MOTIVO'] || 'S/D').toString().trim().toUpperCase();
-                mMap[mot] = (mMap[mot] || 0) + cant;
-
-                // Registro por Estado
-                const edo = (r['ESTADO'] || 'S/D').toString().trim().toUpperCase();
-                eMap[edo] = (eMap[edo] || 0) + cant;
+            Plotly.newPlot('chart-facturas-doble-eje', [
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [factDespA, factDespB], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcFactA, porcFactB], name: '% Rechazo Facturas', yaxis: 'y2', type: 'scatter', mode: 'lines+markers', line: {color: '#e74c3c', width:3} }
+            ], {
+                title: 'Facturas Totales vs % Devolución',
+                yaxis: {title: 'Volumen Facturas'},
+                yaxis2: {title: '% Rechazo', titlefont: {color: '#e74c3c'}, tickfont: {color: '#e74c3c'}, overlaying: 'y', side: 'right'}
             });
+            document.getElementById('obs-facturas').innerHTML = `El porcentaje de efectividad de facturación en el periodo B se sitúa en <b>${porcFactB.toFixed(2)}%</b> de rechazos.`;
 
-            // Inyectar datos en Tarjetas
-            const p26 = v26 > 0 ? (totalCajasDev / v26) * 100 : 0;
-            document.getElementById('perc-cajas').innerText = p26.toFixed(2) + "%";
-            document.getElementById('total-vol').innerText = Math.round(v26).toLocaleString();
-            document.getElementById('total-dev').innerText = Math.round(totalCajasDev).toLocaleString();
+            // 4. Top 6 Motivos
+            let motMap = {};
+            devAmbosMeses.forEach(r => { let m = r['MOTIVO'] || 'OTROS'; motMap[m] = (motMap[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let topMotivos = Object.keys(motMap).sort((a,b) => motMap[b] - motMap[a]).slice(0,6);
+            Plotly.newPlot('chart-motivos', [{ x: topMotivos, y: topMotivos.map(m => motMap[m]), type: 'bar', marker: {color: '#2c3e50'} }], { title: 'Top 6 Motivos Críticos' });
+            document.getElementById('obs-motivos').innerHTML = `La principal falla táctica en el periodo seleccionado es: <b>${topMotivos[0] || 'N/A'}</b>.`;
 
-            if(p26 > 3) document.getElementById('card-cajas').classList.add('critico');
+            // 5. Cajas por Producto
+            let prodMap = {};
+            devAmbosMeses.forEach(r => { let p = r['PRODUCTO'] || 'S/D'; prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0,5);
+            Plotly.newPlot('chart-productos', [{ y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', marker: {color: '#d35400'} }], { title: 'Cajas Devueltas por Producto (Top)' });
+            document.getElementById('obs-productos').innerHTML = `El SKU con mayor impacto negativo en inventario es <b>${topProds[0] || 'N/A'}</b>.`;
 
-            // --- GRÁFICOS ---
-            const xMeses = nombreMeses.filter(m => mesMap[m] !== undefined);
-            const yMeses = xMeses.map(m => mesMap[m]);
-            Plotly.newPlot('chart-meses', [{ x: xMeses, y: yMeses, type: 'scatter', mode: 'lines+markers', line: {color: '#003366', width: 3} }], { title: 'Comportamiento de Devoluciones por Mes' });
-            const topMes = xMeses.reduce((a, b) => mesMap[a] > mesMap[b] ? a : b, "N/A");
-            document.getElementById('obs-meses').innerHTML = `<strong>Análisis Temporal:</strong> El mes con mayor pico de actividad registrado es <b>${topMes}</b>.`;
+            // 6. Top 6 Responsables
+            let respMap = {};
+            devAmbosMeses.forEach(r => { let re = r['RESPONSABLE'] || 'S/D'; respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
+            Plotly.newPlot('chart-responsables', [{ labels: topResp, values: topResp.map(re => respMap[re]), type: 'pie', hole:0.4 }], { title: 'Top 6 Áreas Responsables' });
+            document.getElementById('obs-responsables').innerHTML = `La gerencia debe enfocar auditorías de control directo sobre el departamento de <b>${topResp[0] || 'N/A'}</b>.`;
 
-            Plotly.newPlot('chart-responsables', [{ labels: Object.keys(respMap), values: Object.values(respMap), type: 'pie', hole: 0.4 }], { title: 'Fallas Distribuidas por Responsable' });
-            const topResp = Object.keys(respMap).reduce((a, b) => respMap[a] > respMap[b] ? a : b, "N/A");
-            document.getElementById('obs-responsables').innerHTML = `<strong>Causa Departamento:</strong> El área con mayor asignación de novedades es <b>${topResp}</b>.`;
+            // 7. Distribución por Estado
+            let edoMap = {};
+            devAmbosMeses.forEach(r => { let e = r['ESTADO'] || 'S/D'; edoMap[e] = (edoMap[e] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let totalEdo = Object.values(edoMap).reduce((x,y)=>x+y, 0) || 1;
+            let edosLabels = Object.keys(edoMap);
+            let edosValues = edosLabels.map(e => (edoMap[e]/totalEdo)*100);
+            Plotly.newPlot('chart-estados', [{ labels: edosLabels, values: edosValues, type: 'pie' }], { title: '% Devoluciones por Región' });
+            document.getElementById('obs-estados').innerHTML = `La concentración comercial con mayor vulnerabilidad es <b>${edosLabels[edosValues.indexOf(Math.max(...edosValues))] || 'N/A'}</b>.`;
 
-            Plotly.newPlot('chart-motivos', [{ x: Object.keys(mMap), y: Object.values(mMap), type: 'bar', marker: {color: '#2c3e50'} }], { title: 'Principales Motivos del Año' });
-            const topM = Object.keys(mMap).reduce((a, b) => mMap[a] > mMap[b] ? a : b, "N/A");
-            document.getElementById('obs-motivos').innerHTML = `<strong>Incidencia Crítica:</strong> La causa de mayor impacto físico es <b>${topM}</b>.`;
+            // 8. Flota (Transporte y Chofer con más incidencias)
+            let transMap = {}, chofMap = {};
+            devAmbosMeses.forEach(r => {
+                let t = r['TRANSPORTE'] || 'S/D'; let c = r['CHOFER'] || 'S/D';
+                transMap[t] = (transMap[t] || 0) + 1; chofMap[c] = (chofMap[c] || 0) + 1;
+            });
+            let topTrans = Object.keys(transMap).reduce((x,y) => transMap[x] > transMap[y] ? x : y, "N/A");
+            let topChof = Object.keys(chofMap).reduce((x,y) => chofMap[x] > chofMap[y] ? x : y, "N/A");
 
-            Plotly.newPlot('chart-estados', [{ y: Object.keys(eMap), x: Object.values(eMap), type: 'bar', orientation: 'h', marker: {color: '#27ae60'} }], { title: 'Impacto por Región / Estado' });
-            const topE = Object.keys(eMap).reduce((a, b) => eMap[a] > eMap[b] ? a : b, "N/A");
-            document.getElementById('obs-estados').innerHTML = `<strong>Control Territorial:</strong> La zona con mayores reclamos comerciales es <b>${topE}</b>.`;
+            Plotly.newPlot('chart-flota', [{
+                x: ['Línea Transporte', 'Operador Chofer'], y: [transMap[topTrans] || 0, chofMap[topChof] || 0], type: 'bar', marker: {color: '#e67e22'}
+            }], { title: 'Rendimiento Crítico de Flota (Frecuencia)' });
+            document.getElementById('obs-flota').innerHTML = `<strong>Línea Alerta:</strong> <b>${topTrans}</b> | <strong>Chofer Alerta:</strong> <b>${topChof}</b>.`;
+
+            document.getElementById('status').innerText = "Dashboard Actualizado: " + new Date().toLocaleTimeString();
         }
-        window.onload = cargar;
+
+        window.onload = inicializar;
     </script>
 </body>
 </html>
