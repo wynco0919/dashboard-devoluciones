@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Wynco | Dashboard de Gestión Operativa 2026</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <title>Wynco | Dashboard Gerencial 2026</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         :root { --primary: #003366; --accent: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; --dark: #2c3e50; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--dark); }
@@ -20,25 +20,25 @@
 </head>
 <body>
     <div class="header">
-        <h1>Wynco: Reporte Gerencial de Devoluciones (Año 2026)</h1>
-        <div id="status">Sincronizando con GitHub...</div>
+        <h1>Wynco: Reporte Operativo de Devoluciones (Año 2026)</h1>
+        <div id="status">Iniciando lectura de datos...</div>
     </div>
 
     <div class="grid-kpis">
         <div class="card" id="card-cajas">
             <h3>% Devolución Global (2026)</h3>
             <div id="perc-cajas" class="value">0%</div>
-            <div style="font-size: 0.85em; color: #666;">Umbral Crítico: 3.00%</div>
+            <div style="font-size: 0.85em; color: #666;">Umbral Máximo Tol.: 3.00%</div>
         </div>
         <div class="card">
             <h3>Total Cajas Despachadas</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.85em; color: #666;">Acumulado en Ruta 2026</div>
+            <div style="font-size: 0.85em; color: #666;">Volumen en Distribución 2026</div>
         </div>
         <div class="card">
             <h3>Total Cajas Devueltas</h3>
             <div id="total-dev" class="value">0</div>
-            <div style="font-size: 0.85em; color: #666;">Incidencias Totales del Año</div>
+            <div style="font-size: 0.85em; color: #666;">Total Producto Retornado</div>
         </div>
     </div>
 
@@ -67,6 +67,7 @@
 
         async function cargar() {
             try {
+                document.getElementById('status').innerText = "Conectando con GitHub...";
                 const [rDes, rDev] = await Promise.all([
                     fetch(URL_DES).then(res => res.text()),
                     fetch(URL_DEV).then(res => res.text())
@@ -74,10 +75,13 @@
 
                 const normalizarHeaders = (h) => h.trim().toUpperCase();
 
-                // Detección automática para despachos
+                // Intentamos procesar con el motor global de PapaParse
+                if (typeof Papa === 'undefined') {
+                    throw new Error("La librería de lectura no cargó correctamente.");
+                }
+
                 const dDes = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizarHeaders}).data;
                 
-                // Limpieza de fila de control opcional de Excel
                 let rawDevText = rDev.trim();
                 if (rawDevText.startsWith("1,2,3") || rawDevText.startsWith("1;2;3")) {
                     rawDevText = rawDevText.substring(rawDevText.indexOf("\n") + 1);
@@ -86,19 +90,19 @@
                 const dDev = Papa.parse(rawDevText, {header:true, skipEmptyLines:true, transformHeader: normalizarHeaders}).data;
 
                 procesar(dDes, dDev);
-                document.getElementById('status').innerText = "Última Sincronización: " + new Date().toLocaleTimeString();
+                document.getElementById('status').innerText = "Sincronizado: " + new Date().toLocaleTimeString();
             } catch(e) { 
                 console.error(e);
-                document.getElementById('status').innerText = "Error cargando las tablas.";
+                document.getElementById('status').innerText = "Falta sincronizar archivos CSV en GitHub.";
             }
         }
 
         function procesar(des, dev) {
-            // 1. Despachos Totales 2026
+            // Sumar Despachos 2026
             const v26 = des.filter(r => r['AÑO'] == "2026")
                            .reduce((a,b) => a + parseFloat(b['CAJAS DESPACHADAS'] || 0), 0);
 
-            // 2. Filtrar Devoluciones 2026 por Fecha Fact. o Registro
+            // Filtrar Devoluciones del 2026
             const dev26 = dev.filter(r => {
                 const f = r['FECHA FACT.'] || r['FECHA REGISTRO2'] || '';
                 return f.toString().includes('2026');
@@ -106,35 +110,33 @@
 
             let totalCajasDev = 0;
             const mesMap = {}, respMap = {}, mMap = {}, eMap = {};
-            
-            // Nombres de meses ordenados para la gráfica
             const nombreMeses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
             dev26.forEach(r => {
                 const cant = parseFloat(r['CANT CAJA DEV'] || r['CAJAS_DEVUELTAS'] || 0);
                 totalCajasDev += cant;
 
-                // Evolución por Mes
+                // Registro por Mes
                 let mIndex = parseInt(r['MES'] || 0);
                 if(mIndex >= 1 && mIndex <= 12) {
                     const mNombre = nombreMeses[mIndex - 1];
                     mesMap[mNombre] = (mesMap[mNombre] || 0) + cant;
                 }
 
-                // Distribución por Responsable
+                // Registro por Responsable
                 const resp = (r['RESPONSABLE'] || 'S/D').toString().trim().toUpperCase();
                 respMap[resp] = (respMap[resp] || 0) + cant;
 
-                // Motivos
+                // Registro por Motivo
                 const mot = (r['MOTIVO'] || 'S/D').toString().trim().toUpperCase();
                 mMap[mot] = (mMap[mot] || 0) + cant;
 
-                // Estados Geográficos
+                // Registro por Estado
                 const edo = (r['ESTADO'] || 'S/D').toString().trim().toUpperCase();
                 eMap[edo] = (eMap[edo] || 0) + cant;
             });
 
-            // Actualizar KPIs principales
+            // Inyectar datos en Tarjetas
             const p26 = v26 > 0 ? (totalCajasDev / v26) * 100 : 0;
             document.getElementById('perc-cajas').innerText = p26.toFixed(2) + "%";
             document.getElementById('total-vol').innerText = Math.round(v26).toLocaleString();
@@ -142,27 +144,24 @@
 
             if(p26 > 3) document.getElementById('card-cajas').classList.add('critico');
 
-            // --- GRÁFICO 1: EVOLUCIÓN MENSUAL ---
+            // --- GRÁFICOS ---
             const xMeses = nombreMeses.filter(m => mesMap[m] !== undefined);
             const yMeses = xMeses.map(m => mesMap[m]);
-            Plotly.newPlot('chart-meses', [{ x: xMeses, y: yMeses, type: 'scatter', mode: 'lines+markers', line: {color: '#003366', width: 3} }], { title: 'Comportamiento y Tendencia por Mes' });
+            Plotly.newPlot('chart-meses', [{ x: xMeses, y: yMeses, type: 'scatter', mode: 'lines+markers', line: {color: '#003366', width: 3} }], { title: 'Comportamiento de Devoluciones por Mes' });
             const topMes = xMeses.reduce((a, b) => mesMap[a] > mesMap[b] ? a : b, "N/A");
-            document.getElementById('obs-meses').innerHTML = `<strong>Tendencia Temporal:</strong> El mes con mayor pico de devoluciones en el sistema fue <b>${topMes}</b>.`;
+            document.getElementById('obs-meses').innerHTML = `<strong>Análisis Temporal:</strong> El mes con mayor pico de actividad registrado es <b>${topMes}</b>.`;
 
-            // --- GRÁFICO 2: DISTRIBUCIÓN POR RESPONSABLE ---
-            Plotly.newPlot('chart-responsables', [{ labels: Object.keys(respMap), values: Object.values(respMap), type: 'pie', hole: 0.4, marker: { colors: ['#003366', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'] } }], { title: 'Responsabilidad de Incidencias (Gerencial)' });
+            Plotly.newPlot('chart-responsables', [{ labels: Object.keys(respMap), values: Object.values(respMap), type: 'pie', hole: 0.4 }], { title: 'Fallas Distribuidas por Responsable' });
             const topResp = Object.keys(respMap).reduce((a, b) => respMap[a] > respMap[b] ? a : b, "N/A");
-            document.getElementById('obs-responsables').innerHTML = `<strong>Análisis de Causa Raíz:</strong> El área asignada con mayor cantidad de novedades es <b>${topResp}</b>.`;
+            document.getElementById('obs-responsables').innerHTML = `<strong>Causa Departamento:</strong> El área con mayor asignación de novedades es <b>${topResp}</b>.`;
 
-            // --- GRÁFICO 3: MOTIVOS PRINCIPALES ---
-            Plotly.newPlot('chart-motivos', [{ x: Object.keys(mMap), y: Object.values(mMap), type: 'bar', marker: {color: '#2c3e50'} }], { title: 'Principales Causas Documentadas' });
+            Plotly.newPlot('chart-motivos', [{ x: Object.keys(mMap), y: Object.values(mMap), type: 'bar', marker: {color: '#2c3e50'} }], { title: 'Principales Motivos del Año' });
             const topM = Object.keys(mMap).reduce((a, b) => mMap[a] > mMap[b] ? a : b, "N/A");
-            document.getElementById('obs-motivos').innerHTML = `<strong>Motivo de Alerta:</strong> La razón que acumula más pérdidas de inventario es <b>${topM}</b>.`;
+            document.getElementById('obs-motivos').innerHTML = `<strong>Incidencia Crítica:</strong> La causa de mayor impacto físico es <b>${topM}</b>.`;
 
-            // --- GRÁFICO 4: IMPACTO GEOGRÁFICO ---
-            Plotly.newPlot('chart-estados', [{ y: Object.keys(eMap), x: Object.values(eMap), type: 'bar', orientation: 'h', marker: {color: '#27ae60'} }], { title: 'Volumen Crítico por Estado' });
+            Plotly.newPlot('chart-estados', [{ y: Object.keys(eMap), x: Object.values(eMap), type: 'bar', orientation: 'h', marker: {color: '#27ae60'} }], { title: 'Impacto por Región / Estado' });
             const topE = Object.keys(eMap).reduce((a, b) => eMap[a] > eMap[b] ? a : b, "N/A");
-            document.getElementById('obs-estados').innerHTML = `<strong>Control Territorial:</strong> El estado geográfico con más reclamos comerciales es <b>${topE}</b>.`;
+            document.getElementById('obs-estados').innerHTML = `<strong>Control Territorial:</strong> La zona con mayores reclamos comerciales es <b>${topE}</b>.`;
         }
         window.onload = cargar;
     </script>
