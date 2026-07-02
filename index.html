@@ -229,33 +229,57 @@
             });
             document.getElementById('obs-productos').innerHTML = `El SKU de mayor impacto negativo es <b>${[...topProds].reverse()[0] || 'N/A'}</b>.`;
 
-            // 6. Top 6 Responsables (Corregido para priorizar VENTAS según la matriz real de Excel)
+           // 6. Distribución por Responsable (Corregido y sin leyendas externas)
             let respMap = {};
             devAmbosMeses.forEach(r => { 
-                let re = (r['RESPONSABLE'] || '').toString().trim();
-                if(re && re !== '0' && re !== '') { respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); }
+                let re = (r['RESPONSABLE'] || '').toString().trim().toUpperCase();
+                if(re && re !== '0' && re !== 'S/D' && re !== '') { 
+                    respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); 
+                }
             });
-            let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
-            Plotly.newPlot('chart-responsables', [{ labels: topResp, values: topResp.map(re => respMap[re]), type: 'pie', hole:0.4 }], { 
-                title: 'Distribución por Responsable', margin: { l: 40, r: 40, t: 50, b: 60 }, legend: { orientation: 'h', y: -0.15 }
+            let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]);
+            let respValues = topResp.map(re => respMap[re]);
+
+            Plotly.newPlot('chart-responsables', [{ 
+                labels: topResp, 
+                values: respValues, 
+                type: 'pie', 
+                hole: 0.45, // Estilo dona para simular volumen y profundidad
+                textinfo: 'label+percent', 
+                textposition: 'inside',
+                marker: { line: { color: '#ffffff', width: 2 } }
+            }], { 
+                title: 'Distribución por Responsable de la Falla', 
+                margin: { l: 20, r: 20, t: 50, b: 50 }, 
+                showlegend: false 
             });
             document.getElementById('obs-responsables').innerHTML = `El área con mayor volumen de fallas operativas asignadas es <b>${topResp[0] || 'N/A'}</b>.`;
 
-            // 7. Distribución por Estado (Porcentaje y nombre directo adentro, sin leyenda externa)
+            // 7. Distribución por Estado Geográfico (Corregido y sin leyendas externas)
             let edoMap = {};
             devAmbosMeses.forEach(r => { 
-                let e = (r['ESTADO'] || '').toString().trim();
-                if(e && e !== '0') { edoMap[e] = (edoMap[e] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); }
+                let e = (r['ESTADO'] || '').toString().trim().toUpperCase();
+                if(e && e !== '0' && e !== 'S/D' && e !== '') { 
+                    edoMap[e] = (edoMap[e] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); 
+                }
             });
-            let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0);
+            let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0).sort((a,b) => edoMap[b] - edoMap[a]);
             let edosValues = edosLabels.map(e => edoMap[e]);
+
             Plotly.newPlot('chart-estados', [{ 
-                labels: edosLabels, values: edosValues, type: 'pie', textinfo: 'label+percent', textposition: 'inside'
+                labels: edosLabels, 
+                values: edosValues, 
+                type: 'pie', 
+                hole: 0.45,
+                textinfo: 'label+percent', 
+                textposition: 'inside',
+                marker: { line: { color: '#ffffff', width: 2 } }
             }], { 
-                title: '% Devoluciones por Estado Geográfico', margin: { l: 20, r: 20, t: 50, b: 50 }, showlegend: false 
+                title: '% Devoluciones por Estado Geográfico', 
+                margin: { l: 20, r: 20, t: 50, b: 50 }, 
+                showlegend: false 
             });
             document.getElementById('obs-estados').innerHTML = `La región comercial con mayor concentración de incidencias es <b>${edosLabels[edosValues.indexOf(Math.max(...edosValues))] || 'N/A'}</b>.`;
-
             // 8. Flota
             let transMap = {}, chofMap = {};
             devAmbosMeses.forEach(r => {
