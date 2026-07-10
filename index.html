@@ -11,11 +11,13 @@
         .header { background: var(--primary); color: white; padding: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .selector-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 20px; align-items: center; }
         select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; color: var(--dark); font-weight: bold; }
-        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; }
         .card.critico { border-top-color: var(--danger); background: #fff5f5; }
         .value { font-size: 1.9em; font-weight: bold; margin: 8px 0; color: var(--primary); }
-        .trend { font-size: 0.9em; font-weight: bold; margin-top: 5px; }
+        .trend { font-size: 1.1em; font-weight: bold; margin-top: 5px; padding: 8px; border-radius: 5px; }
+        .trend.mejora { color: #27ae60; background: #ebf7ee; border: 1px solid #27ae60; }
+        .trend.desmejora { color: var(--danger); background: #fff5f5; border: 1px solid var(--danger); }
         .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 20px; }
         .chart-box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 480px; }
         .insight { background: #eef2f7; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 0.85em; border-left: 4px solid var(--primary); font-weight: 500; }
@@ -24,8 +26,8 @@
 <body>
 
     <div class="header">
-        <h1>Wynco: Inteligencia Operativa de Devoluciones</h1>
-        <div id="status">Sincronizando con bases de datos...</div>
+        <h1>Wynco: Inteligencia Operativa de Devoluciones (Sincronizado)</h1>
+        <div id="status">Conectando...</div>
     </div>
 
     <div class="selector-box">
@@ -37,40 +39,35 @@
             <label for="mesB" style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
             <select id="mesB" onchange="actualizarDashboard()"></select>
         </div>
-        <div style="font-size: 0.9em; color: #555; font-style: italic;">Modifica los meses para contrastar las métricas dinámicamente.</div>
     </div>
 
     <div class="grid-kpis">
-        <div class="card" id="card-cajas-A">
-            <h3 id="titulo-kpi-A">% Devolución Mes A</h3>
-            <div id="perc-cajas-A" class="value">0.00%</div>
-            <div style="font-size: 0.8em; color: #666;">Meta de Gestión: Máx 1.00%</div>
+        <div class="card">
+            <h3 id="lbl-cajas-A">Cajas Mes A</h3>
+            <div id="val-cajas-A" class="value">0</div>
         </div>
-        <div class="card" id="card-cajas-B">
-            <h3 id="titulo-kpi-B">% Devolución Mes B</h3>
-            <div id="perc-cajas-B" class="value">0.00%</div>
+        <div class="card">
+            <h3 id="lbl-cajas-B">Cajas Mes B</h3>
+            <div id="val-cajas-B" class="value">0</div>
+        </div>
+        <div class="card">
+            <h3>Variación Volumen</h3>
             <div id="trend-comparativo" class="trend">--</div>
         </div>
         <div class="card">
-            <h3>Cajas Devueltas (Suma A + B)</h3>
+            <h3>Cajas Procesadas (Suma A+B)</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Volumen físico devuelto acumulado</div>
-        </div>
-        <div class="card">
-            <h3>Total Incidencias (Suma A + B)</h3>
-            <div id="total-dev" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Impacto de transacciones unificadas</div>
         </div>
     </div>
 
     <div class="charts-grid">
-        <div class="chart-box"><div id="chart-responsables"></div><div id="obs-responsables" class="insight"></div></div>
-        <div class="chart-box"><div id="chart-estados"></div><div id="obs-estados" class="insight"></div></div>
-        <div class="chart-box"><div id="chart-participacion-anual"></div><div id="obs-participacion" class="insight"></div></div>
-        <div class="chart-box"><div id="chart-cierre-mes"></div><div id="obs-cierre" class="insight"></div></div>
-        <div class="chart-box"><div id="chart-facturas-doble-eje"></div><div id="obs-facturas" class="insight"></div></div>
         <div class="chart-box"><div id="chart-motivos"></div><div id="obs-motivos" class="insight"></div></div>
         <div class="chart-box"><div id="chart-productos"></div><div id="obs-productos" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-estados"></div><div id="obs-estados" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-responsables"></div><div id="obs-responsables" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-facturas-doble-eje"></div><div id="obs-facturas" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-cierre-mes"></div><div id="obs-cierre" class="insight"></div></div>
+        <div class="chart-box"><div id="chart-participacion-anual"></div><div id="obs-participacion" class="insight"></div></div>
         <div class="chart-box"><div id="chart-flota"></div><div id="obs-flota" class="insight"></div></div>
     </div>
 
@@ -90,7 +87,6 @@
                 ]);
 
                 const normalizar = (h) => h.trim().toUpperCase();
-
                 BD_DESPACHOS = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizar}).data;
                 
                 let rawDev = rDev.trim();
@@ -101,18 +97,17 @@
 
                 const selectorA = document.getElementById('mesA');
                 const selectorB = document.getElementById('mesB');
-                
                 nombreMeses.forEach((m, idx) => {
                     selectorA.add(new Option(m, idx + 1));
                     selectorB.add(new Option(m, idx + 1));
                 });
 
-                selectorA.value = 5; // Inicia Mayo por defecto
-                selectorB.value = 6; // Inicia Junio por defecto
+                selectorA.value = 5; // MAYO
+                selectorB.value = 6; // JUNIO
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
-                document.getElementById('status').innerText = "Error leyendo archivos. Verifica nombres en GitHub.";
+                document.getElementById('status').innerText = "Error leyendo archivos de GitHub.";
             }
         }
 
@@ -120,157 +115,101 @@
             const mesA = parseInt(document.getElementById('mesA').value);
             const mesB = parseInt(document.getElementById('mesB').value);
 
-            document.getElementById('titulo-kpi-A').innerText = `% Devolución ${nombreMeses[mesA-1]}`;
-            document.getElementById('titulo-kpi-B').innerText = `% Devolución ${nombreMeses[mesB-1]}`;
+            document.getElementById('lbl-cajas-A').innerText = `Cajas ${nombreMeses[mesA-1]}`;
+            document.getElementById('lbl-cajas-B').innerText = `Cajas ${nombreMeses[mesB-1]}`;
 
-            const desMesA = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesA || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesA-1]);
-            const desMesB = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesB || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesB-1]);
-
-            const cajasDespA = parseFloat(desMesA ? (desMesA['CAJAS DESPACHADAS'] || desMesA['TOTAL CAJAS'] || 0) : 0);
-            const cajasDespB = parseFloat(desMesB ? (desMesB['CAJAS DESPACHADAS'] || desMesB['TOTAL CAJAS'] || 0) : 0);
-
-            // Filtrado de data de base de devoluciones
             const devMesA = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesA);
             const devMesB = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesB);
-            const devAnual = BD_DEVOLUCIONES.filter(r => (r['FECHA FACT.'] || '').toString().includes('2026'));
-
-            const granTotalDevAnual = devAnual.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0) || 1;
-            const cajasDevA = devMesA.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
-            const cajasDevB = devMesB.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
-
-            const pA = cajasDespA > 0 ? (cajasDevA / cajasDespA) * 100 : 0;
-            const pB = cajasDespB > 0 ? (cajasDevB / cajasDespB) * 100 : 0;
-
-            document.getElementById('perc-cajas-A').innerText = pA.toFixed(2) + "%";
-            document.getElementById('perc-cajas-B').innerText = pB.toFixed(2) + "%";
-            
-            // KPIs globales sumando los meses seleccionados A y B
-            document.getElementById('total-vol').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
-            document.getElementById('total-dev').innerText = (devMesA.length + devMesB.length).toLocaleString(); 
-
-            document.getElementById('card-cajas-A').className = pA > 1 ? 'card critico' : 'card';
-            document.getElementById('card-cajas-B').className = pB > 1 ? 'card critico' : 'card';
-
-            const variacion = pB - pA;
-            if(variacion > 0) {
-                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--danger)">▲ Desmejora de ${variacion.toFixed(2)}%</span> respecto a ${nombreMeses[mesA-1]}`;
-            } else {
-                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--accent)">▼ Mejora de ${Math.abs(variacion).toFixed(2)}%</span> respecto a ${nombreMeses[mesA-1]}`;
-            }
-
             const devAmbosMeses = [...devMesA, ...devMesB];
 
-            // ====================================================================
-            // 🛠️ BLOQUE DE LAS 2 GRÁFICAS CORREGIDAS (SUMANDO AMBOS MESES SELECCIONADOS)
-            // ====================================================================
+            const cajasDevA = devMesA.reduce((sum, r) => sum + parseFloat(r['CANT CAJA DEV'] || 0), 0);
+            const cajasDevB = devMesB.reduce((sum, r) => sum + parseFloat(r['CANT CAJA DEV'] || 0), 0);
 
-            // 6. Gráfica Responsables: Suma de Cajas Dividido entre el Total de Cajas (Mayo + Junio)
-            let respMap = {};
-            devAmbosMeses.forEach(r => { 
-                let re = (r['RESPONSABLE'] || '').toString().trim().toUpperCase();
-                if(re && re !== '0' && re !== 'S/D' && re !== '') { 
-                    respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); // SUMA CAJAS
-                }
-            });
-            let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
-            let respValues = topResp.map(re => respMap[re]);
+            document.getElementById('val-cajas-A').innerText = Math.round(cajasDevA).toLocaleString();
+            document.getElementById('val-cajas-B').innerText = Math.round(cajasDevB).toLocaleString();
+            document.getElementById('total-vol').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
 
-            Plotly.newPlot('chart-responsables', [{ 
-                labels: topResp, 
-                values: respValues, 
-                type: 'pie', 
-                hole: 0.4, 
-                textinfo: 'label+percent', 
-                textposition: 'inside',
-                insidetextorientation: 'radial',
-                marker: { line: { color: '#ffffff', width: 2 } }
-            }], { 
-                title: 'Top 6 Responsables (Volumen de Cajas Devueltas)', 
-                margin: { l: 20, r: 20, t: 60, b: 40 }, 
-                showlegend: false
-            });
-            document.getElementById('obs-responsables').innerHTML = `El área asignada con mayor volumen físico de cajas en el periodo evaluado es <b>${topResp[0] || 'N/A'}</b>.`;
+            // Cálculo exacto de la variación porcentual (-15% Mejorando de Excel)
+            const pctVar = cajasDevA > 0 ? ((cajasDevB - cajasDevA) / cajasDevA) * 100 : 0;
+            const trendBox = document.getElementById('trend-comparativo');
+            if (pctVar <= 0) {
+                trendBox.className = "trend mejora";
+                trendBox.innerText = `▼ ${Math.abs(pctVar).toFixed(0)}% Mejorando`;
+            } else {
+                trendBox.className = "trend desmejora";
+                trendBox.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
+            }
 
-            // 7. Gráfica Estados: TOTAL CONTROL (Conteo) dividido entre el Total de Incidencias (Mayo + Junio)
+            const layoutBase = { automargin: true, margin: { l: 50, r: 40, t: 60, b: 60 } };
+
+            // 1. TOP 6 MOTIVOS COMPARTIDOS POR MES (Barras agrupadas)
+            let motMapA = {}, motMapB = {};
+            devMesA.forEach(r => { let m = (r['MOTIVO'] || 'OTROS').trim(); motMapA[m] = (motMapA[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            devMesB.forEach(r => { let m = (r['MOTIVO'] || 'OTROS').trim(); motMapB[m] = (motMapB[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            
+            let todosMotivos = [...new Set([...Object.keys(motMapA), ...Object.keys(motMapB)])];
+            todosMotivos.sort((a,b) => ((motMapA[b]||0)+(motMapB[b]||0)) - ((motMapA[a]||0)+(motMapB[a]||0)));
+            let top6Motivos = todosMotivos.slice(0, 6);
+
+            Plotly.newPlot('chart-motivos', [
+                { x: top6Motivos, y: top6Motivos.map(m => motMapA[m]||0), name: nombreMeses[mesA-1], type: 'bar', marker: {color: '#1f77b4'} },
+                { x: top6Motivos, y: top6Motivos.map(m => motMapB[m]||0), name: nombreMeses[mesB-1], type: 'bar', marker: {color: '#aec7e8'} }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'Top 6 Motivo de las Devoluciones por Mes' }));
+
+            // 2. CANTIDAD DE CAJAS DEVUELTAS POR PRODUCTO
+            let prodMap = {};
+            devAmbosMeses.forEach(r => { let p = (r['PRODUCTO'] || 'S/D').trim(); prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, 5).reverse();
+            Plotly.newPlot('chart-productos', [{ y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', marker: {color: '#3182bd'} }], Object.assign({}, layoutBase, { title: 'Cantidad de Cajas Devueltas por Producto', margin: { l: 200 } }));
+
+            // 3. PORCENTAJE DE DEVOLUCIONES POR ESTADO
             let edoMap = {};
-            devAmbosMeses.forEach(r => { 
-                let e = (r['ESTADO'] || '').toString().trim().toUpperCase();
-                if(e && e !== '0' && e !== 'S/D' && e !== '') { 
-                    edoMap[e] = (edoMap[e] || 0) + 1; // CONTEO TOTAL CONTROL
-                }
-            });
-            let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0).sort((a,b) => edoMap[b] - edoMap[a]).slice(0,6);
-            let edosValues = edosLabels.map(e => edoMap[e]);
+            devAmbosMeses.forEach(r => { let e = (r['ESTADO'] || 'S/D').trim(); edoMap[e] = (edoMap[e] || 0) + 1; });
+            let edosLabels = Object.keys(edoMap).sort((a,b) => edoMap[b] - edoMap[a]).slice(0, 6);
+            Plotly.newPlot('chart-estados', [{ labels: edosLabels, values: edosLabels.map(e => edoMap[e]), type: 'pie', textinfo: 'label+percent', textposition: 'inside' }], { title: '% Devoluciones por Estado', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
 
-            Plotly.newPlot('chart-estados', [{ 
-                labels: edosLabels, 
-                values: edosValues, 
-                type: 'pie', 
-                hole: 0.4, 
-                textinfo: 'label+percent', 
-                textposition: 'inside',
-                insidetextorientation: 'radial',
-                marker: { line: { color: '#ffffff', width: 2 } }
-            }], { 
-                title: 'Top 6 Estados con Mayor Incidencia (TOTAL CONTROL)', 
-                margin: { l: 20, r: 20, t: 60, b: 40 }, 
-                showlegend: false
-            });
-            document.getElementById('obs-estados').innerHTML = `El territorio con mayor frecuencia de reclamos es <b>${edosLabels[0] || 'N/A'}</b>.`;
+            // 4. TOP 6 RESPONSABLES (Mapeado exacto a la suma de Cajas)
+            let respMap = {};
+            devAmbosMeses.forEach(r => { let re = (r['RESPONSABLE'] || 'S/D').trim(); respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0, 6);
+            Plotly.newPlot('chart-responsables', [{ x: topResp, y: topResp.map(re => respMap[re]), type: 'bar', marker: {color: '#003366'} }], Object.assign({}, layoutBase, { title: 'Top 6 Devoluciones por Responsable (Cajas)' }));
 
+            // 5. FACTURAS DESPACHADAS VS DEVUELTAS
+            const desMesA = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesA || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesA-1]);
+            const desMesB = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesB || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesB-1]);
+            const fDespA = parseFloat(desMesA ? desMesA['FACTURAS DESPACHADAS'] : 0);
+            const fDespB = parseFloat(desMesB ? desMesB['FACTURAS DESPACHADAS'] : 0);
+            const fDevA = parseFloat(desMesA ? desMesA['FACTURAS DEVUELTAS'] : 0);
+            const fDevB = parseFloat(desMesB ? desMesB['FACTURAS DEVUELTAS'] : 0);
+            Plotly.newPlot('chart-facturas-doble-eje', [
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [fDespA, fDespB], name: 'Despachadas', type: 'bar' },
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [fDevA, fDevB], name: 'Devueltas', type: 'bar' }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'Facturas Despachadas vs Devueltas' }));
 
-            // --- OTRAS GRÁFICAS ---
-            // 1. Participación Anual
-            const porcA = (cajasDevA / granTotalDevAnual) * 100;
-            const porcB = (cajasDevB / granTotalDevAnual) * 100;
-            Plotly.newPlot('chart-participacion-anual', [{
-                x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcA, porcB], type: 'bar', marker: {color: '#34495e'}, text: [porcA.toFixed(1)+'%', porcB.toFixed(1)+'%'], textposition: 'auto'
-            }], { title: '% Representación vs Total Anual', margin: { l: 50, r: 40, t: 50, b: 60 } });
-
-            // 2. Cierre de Mes
+            // 6. CIERRE DE MES (Antes del 28 vs Cierre)
             let normalCajas = 0, cierreCajas = 0;
             devAmbosMeses.forEach(r => {
                 const comentario = (r['COMENTARIOS'] || '').toString().toUpperCase();
-                if(comentario.includes('FIN DE MES')) cierreCajas += parseFloat(r['CANT CAJA DEV'] || 0);
-                else normalCajas += parseFloat(r['CANT CAJA DEV'] || 0);
+                const cant = parseFloat(r['CANT CAJA DEV'] || 0);
+                if(comentario.includes('FIN DE MES')) cierreCajas += cant;
+                else normalCajas += cant;
             });
-            Plotly.newPlot('chart-cierre-mes', [{ labels: ['Venta Normal', 'Venta Fin de Mes'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4 }], { title: 'Comportamiento Cierre', legend: { orientation: 'h', y: -0.15 } });
+            Plotly.newPlot('chart-cierre-mes', [{ labels: ['Venta Normal', 'Venta Fin de Mes'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4 }], { title: 'Cajas Devueltas Normal vs Fin de Mes', legend: { orientation: 'h', y: -0.1 } });
 
-            // 3. Eje Secundario
-            const factDespA = parseFloat(desMesA ? (desMesA['FACTURAS DESPACHADAS'] || 0) : 0);
-            const factDespB = parseFloat(desMesB ? (desMesB['FACTURAS DESPACHADAS'] || 0) : 0);
-            const factDevA = parseFloat(desMesA ? (desMesA['FACTURAS DEVUELTAS'] || 0) : 0);
-            const factDevB = parseFloat(desMesB ? (desMesB['FACTURAS DEVUELTAS'] || 0) : 0);
-            const porcFactA = factDespA > 0 ? (factDevA / factDespA) * 100 : 0;
-            const porcFactB = factDespB > 0 ? (factDevB / factDespB) * 100 : 0;
+            // 7. PARTICIPACIÓN ANUAL
+            const devAnual = BD_DEVOLUCIONES.filter(r => (r['FECHA FACT.'] || '').toString().includes('2026'));
+            const granTotalAnual = devAnual.reduce((sum, r) => sum + parseFloat(r['CANT CAJA DEV'] || 0), 0) || 1;
+            Plotly.newPlot('chart-participacion-anual', [{ x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [(cajasDevA/granTotalAnual)*100, (cajasDevB/granTotalAnual)*100], type: 'bar', textposition: 'auto' }], { title: '% Representación sobre el Total Anual 2026' });
 
-            Plotly.newPlot('chart-facturas-doble-eje', [
-                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [factDespA, factDespB], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
-                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcFactA, porcFactB], name: '% Rechazo', yaxis: 'y2', type: 'scatter', mode: 'lines+markers' }
-            ], { yaxis: {title: 'Volumen'}, yaxis2: {overlaying: 'y', side: 'right'} });
-
-            // 4. Motivos
-            let motMap = {};
-            devAmbosMeses.forEach(r => { let m = (r['MOTIVO'] || '').toString().trim(); if(m && m !== '0') { motMap[m] = (motMap[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
-            let topM = Object.keys(motMap).sort((a,b) => motMap[b] - motMap[a]).slice(0,6).reverse();
-            Plotly.newPlot('chart-motivos', [{ y: topM, x: topM.map(m => motMap[m]), type: 'bar', orientation: 'h' }], { title: 'Top 6 Motivos', margin: { l: 150 } });
-
-            // 5. Productos
-            let prodMap = {};
-            devAmbosMeses.forEach(r => { let p = (r['PRODUCTO'] || '').toString().trim(); if(p && p !== '0') { prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
-            let topP = Object.keys(prodMap).sort((a,b) => prodMap[b] - motMap[a]).slice(0,5).reverse();
-            Plotly.newPlot('chart-productos', [{ y: topP, x: topP.map(p => prodMap[p]), type: 'bar', orientation: 'h' }], { title: 'Top 5 Productos', margin: { l: 200 } });
-
-            // 8. Flota
+            // 8. FLOTA (TRANSPORTE Y CHOFER)
             let transMap = {}, chofMap = {};
             devAmbosMeses.forEach(r => {
-                let t = (r['TRANSPORTE'] || '').toString().trim(); let c = (r['CHOFER'] || '').toString().trim();
-                if(t && t !== '0') transMap[t] = (transMap[t] || 0) + 1;
-                if(c && c !== '0') chofMap[c] = (chofMap[c] || 0) + 1;
+                let t = (r['TRANSPORTE'] || 'S/D').trim(); let c = (r['CHOFER'] || 'S/D').trim();
+                transMap[t] = (transMap[t] || 0) + parseFloat(r['CANT CAJA DEV'] || 0);
+                chofMap[c] = (chofMap[c] || 0) + parseFloat(r['CANT CAJA DEV'] || 0);
             });
-            let topTrans = Object.keys(transMap).reduce((x,y) => transMap[x] > transMap[y] ? x : y, "N/A");
-            let topChof = Object.keys(chofMap).reduce((x,y) => chofMap[x] > chofMap[y] ? x : y, "N/A");
-            Plotly.newPlot('chart-flota', [{ x: ['Transporte', 'Chofer'], y: [transMap[topTrans] || 0, chofMap[topChof] || 0], text: [topTrans, topChof], textposition: 'auto' }], { title: 'Control de Flota' });
+            let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, 5);
+            Plotly.newPlot('chart-flota', [{ x: topTrans, y: topTrans.map(t => transMap[t]), type: 'bar', marker: {color: '#e67e22'} }], { title: 'Top Transportes por Cajas Devueltas' });
 
             document.getElementById('status').innerText = "Dashboard Sincronizado: " + new Date().toLocaleTimeString();
         }
