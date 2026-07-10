@@ -30,32 +30,36 @@
 
     <div class="selector-box">
         <div>
-            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Seleccionado:</label>
+            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
             <select id="mesA" onchange="actualizarDashboard()"></select>
         </div>
-        <div style="display:none;"><select id="mesB"></select></div>
+        <div>
+            <label for="mesB" style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
+            <select id="mesB" onchange="actualizarDashboard()"></select>
+        </div>
+        <div style="font-size: 0.9em; color: #555; font-style: italic;">Modifica los meses para contrastar las métricas dinámicamente.</div>
     </div>
 
     <div class="grid-kpis">
         <div class="card" id="card-cajas-A">
-            <h3 id="titulo-kpi-A">% Devolución del Mes</h3>
+            <h3 id="titulo-kpi-A">% Devolución Mes A</h3>
             <div id="perc-cajas-A" class="value">0.00%</div>
             <div style="font-size: 0.8em; color: #666;">Meta de Gestión: Máx 1.00%</div>
         </div>
-        <div class="card">
-            <h3>Total Cajas Despachadas</h3>
-            <div id="kpi-despachadas" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Ventas totales en el mes</div>
+        <div class="card" id="card-cajas-B">
+            <h3 id="titulo-kpi-B">% Devolución Mes B</h3>
+            <div id="perc-cajas-B" class="value">0.00%</div>
+            <div id="trend-comparativo" class="trend">--</div>
         </div>
         <div class="card">
-            <h3>Total Cajas Devueltas</h3>
-            <div id="kpi-cajas-A-solo" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Volumen físico devuelto (Suma de Cajas)</div>
-        </div>
-        <div class="card">
-            <h3>Total Incidencias (Control)</h3>
+            <h3>Cajas Devueltas (Suma A + B)</h3>
             <div id="total-vol" class="value">0</div>
-            <div style="font-size: 0.8em; color: #666;">Número de filas de incidencias evaluadas</div>
+            <div style="font-size: 0.8em; color: #666;">Volumen físico devuelto acumulado</div>
+        </div>
+        <div class="card">
+            <h3>Total Incidencias (Suma A + B)</h3>
+            <div id="total-dev" class="value">0</div>
+            <div style="font-size: 0.8em; color: #666;">Impacto de transacciones unificadas</div>
         </div>
     </div>
 
@@ -96,11 +100,15 @@
                 BD_DEVOLUCIONES = Papa.parse(rawDev, {header:true, skipEmptyLines:true, transformHeader: normalizar}).data;
 
                 const selectorA = document.getElementById('mesA');
+                const selectorB = document.getElementById('mesB');
+                
                 nombreMeses.forEach((m, idx) => {
                     selectorA.add(new Option(m, idx + 1));
+                    selectorB.add(new Option(m, idx + 1));
                 });
 
-                selectorA.value = 5; // Inicia en Mayo por defecto para contrastar de inmediato
+                selectorA.value = 5; // Inicia Mayo por defecto
+                selectorB.value = 6; // Inicia Junio por defecto
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
@@ -110,37 +118,58 @@
 
         function actualizarDashboard() {
             const mesA = parseInt(document.getElementById('mesA').value);
+            const mesB = parseInt(document.getElementById('mesB').value);
 
             document.getElementById('titulo-kpi-A').innerText = `% Devolución ${nombreMeses[mesA-1]}`;
+            document.getElementById('titulo-kpi-B').innerText = `% Devolución ${nombreMeses[mesB-1]}`;
 
             const desMesA = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesA || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesA-1]);
-            const cajasDespA = parseFloat(desMesA ? (desMesA['CAJAS DESPACHADAS'] || desMesA['TOTAL CAJAS'] || 0) : 0);
+            const desMesB = BD_DESPACHOS.find(r => parseInt(r['MES']) === mesB || (r['MES'] || '').toString().toUpperCase() === nombreMeses[mesB-1]);
 
+            const cajasDespA = parseFloat(desMesA ? (desMesA['CAJAS DESPACHADAS'] || desMesA['TOTAL CAJAS'] || 0) : 0);
+            const cajasDespB = parseFloat(desMesB ? (desMesB['CAJAS DESPACHADAS'] || desMesB['TOTAL CAJAS'] || 0) : 0);
+
+            // Filtrado de data de base de devoluciones
             const devMesA = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesA);
+            const devMesB = BD_DEVOLUCIONES.filter(r => parseInt(r['MES']) === mesB);
             const devAnual = BD_DEVOLUCIONES.filter(r => (r['FECHA FACT.'] || '').toString().includes('2026'));
 
             const granTotalDevAnual = devAnual.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0) || 1;
             const cajasDevA = devMesA.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
+            const cajasDevB = devMesB.reduce((a,b) => a + parseFloat(b['CANT CAJA DEV'] || 0), 0);
 
             const pA = cajasDespA > 0 ? (cajasDevA / cajasDespA) * 100 : 0;
+            const pB = cajasDespB > 0 ? (cajasDevB / cajasDespB) * 100 : 0;
 
             document.getElementById('perc-cajas-A').innerText = pA.toFixed(2) + "%";
-            document.getElementById('kpi-despachadas').innerText = Math.round(cajasDespA).toLocaleString();
-            document.getElementById('kpi-cajas-A-solo').innerText = Math.round(cajasDevA).toLocaleString();
-            document.getElementById('total-vol').innerText = devMesA.length.toLocaleString(); 
+            document.getElementById('perc-cajas-B').innerText = pB.toFixed(2) + "%";
+            
+            // KPIs globales sumando los meses seleccionados A y B
+            document.getElementById('total-vol').innerText = Math.round(cajasDevA + cajasDevB).toLocaleString();
+            document.getElementById('total-dev').innerText = (devMesA.length + devMesB.length).toLocaleString(); 
 
             document.getElementById('card-cajas-A').className = pA > 1 ? 'card critico' : 'card';
+            document.getElementById('card-cajas-B').className = pB > 1 ? 'card critico' : 'card';
+
+            const variacion = pB - pA;
+            if(variacion > 0) {
+                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--danger)">▲ Desmejora de ${variacion.toFixed(2)}%</span> respecto a ${nombreMeses[mesA-1]}`;
+            } else {
+                document.getElementById('trend-comparativo').innerHTML = `<span style="color:var(--accent)">▼ Mejora de ${Math.abs(variacion).toFixed(2)}%</span> respecto a ${nombreMeses[mesA-1]}`;
+            }
+
+            const devAmbosMeses = [...devMesA, ...devMesB];
 
             // ====================================================================
-            // 🛠️ BLOQUE 1 PERFECCIONADO: GRÁFICA DE RESPONSABLES Y ESTADOS (TOP 6)
+            // 🛠️ BLOQUE DE LAS 2 GRÁFICAS CORREGIDAS (SUMANDO AMBOS MESES SELECCIONADOS)
             // ====================================================================
 
-            // 6. Gráfica Responsables: Suma de Cajas Dividido entre el Total de Cajas
+            // 6. Gráfica Responsables: Suma de Cajas Dividido entre el Total de Cajas (Mayo + Junio)
             let respMap = {};
-            devMesA.forEach(r => { 
+            devAmbosMeses.forEach(r => { 
                 let re = (r['RESPONSABLE'] || '').toString().trim().toUpperCase();
                 if(re && re !== '0' && re !== 'S/D' && re !== '') { 
-                    respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); 
+                    respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); // SUMA CAJAS
                 }
             });
             let topResp = Object.keys(respMap).filter(re => respMap[re] > 0).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
@@ -160,14 +189,14 @@
                 margin: { l: 20, r: 20, t: 60, b: 40 }, 
                 showlegend: false
             });
-            document.getElementById('obs-responsables').innerHTML = `El área asignada con mayor volumen físico de cajas en el mes evaluado es <b>${topResp[0] || 'N/A'}</b>.`;
+            document.getElementById('obs-responsables').innerHTML = `El área asignada con mayor volumen físico de cajas en el periodo evaluado es <b>${topResp[0] || 'N/A'}</b>.`;
 
-            // 7. Gráfica Estados: TOTAL CONTROL (Conteo) dividido entre el Total de Incidencias
+            // 7. Gráfica Estados: TOTAL CONTROL (Conteo) dividido entre el Total de Incidencias (Mayo + Junio)
             let edoMap = {};
-            devMesA.forEach(r => { 
+            devAmbosMeses.forEach(r => { 
                 let e = (r['ESTADO'] || '').toString().trim().toUpperCase();
                 if(e && e !== '0' && e !== 'S/D' && e !== '') { 
-                    edoMap[e] = (edoMap[e] || 0) + 1; 
+                    edoMap[e] = (edoMap[e] || 0) + 1; // CONTEO TOTAL CONTROL
                 }
             });
             let edosLabels = Object.keys(edoMap).filter(e => edoMap[e] > 0).sort((a,b) => edoMap[b] - edoMap[a]).slice(0,6);
@@ -190,16 +219,17 @@
             document.getElementById('obs-estados').innerHTML = `El territorio con mayor frecuencia de reclamos es <b>${edosLabels[0] || 'N/A'}</b>.`;
 
 
-            // --- OTRAS GRÁFICAS DEL TABLERO EN ESPERA DE REVISIÓN ---
+            // --- OTRAS GRÁFICAS ---
             // 1. Participación Anual
             const porcA = (cajasDevA / granTotalDevAnual) * 100;
+            const porcB = (cajasDevB / granTotalDevAnual) * 100;
             Plotly.newPlot('chart-participacion-anual', [{
-                x: [nombreMeses[mesA-1]], y: [porcA], type: 'bar', marker: {color: '#34495e'}, text: [porcA.toFixed(1)+'%'], textposition: 'auto'
+                x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcA, porcB], type: 'bar', marker: {color: '#34495e'}, text: [porcA.toFixed(1)+'%', porcB.toFixed(1)+'%'], textposition: 'auto'
             }], { title: '% Representación vs Total Anual', margin: { l: 50, r: 40, t: 50, b: 60 } });
 
             // 2. Cierre de Mes
             let normalCajas = 0, cierreCajas = 0;
-            devMesA.forEach(r => {
+            devAmbosMeses.forEach(r => {
                 const comentario = (r['COMENTARIOS'] || '').toString().toUpperCase();
                 if(comentario.includes('FIN DE MES')) cierreCajas += parseFloat(r['CANT CAJA DEV'] || 0);
                 else normalCajas += parseFloat(r['CANT CAJA DEV'] || 0);
@@ -208,28 +238,32 @@
 
             // 3. Eje Secundario
             const factDespA = parseFloat(desMesA ? (desMesA['FACTURAS DESPACHADAS'] || 0) : 0);
+            const factDespB = parseFloat(desMesB ? (desMesB['FACTURAS DESPACHADAS'] || 0) : 0);
             const factDevA = parseFloat(desMesA ? (desMesA['FACTURAS DEVUELTAS'] || 0) : 0);
+            const factDevB = parseFloat(desMesB ? (desMesB['FACTURAS DEVUELTAS'] || 0) : 0);
             const porcFactA = factDespA > 0 ? (factDevA / factDespA) * 100 : 0;
+            const porcFactB = factDespB > 0 ? (factDevB / factDespB) * 100 : 0;
+
             Plotly.newPlot('chart-facturas-doble-eje', [
-                { x: [nombreMeses[mesA-1]], y: [factDespA], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
-                { x: [nombreMeses[mesA-1]], y: [porcFactA], name: '% Rechazo', yaxis: 'y2', type: 'scatter', mode: 'lines+markers' }
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [factDespA, factDespB], name: 'Facturas Emitidas', type: 'bar', marker: {color: '#95a5a6'} },
+                { x: [nombreMeses[mesA-1], nombreMeses[mesB-1]], y: [porcFactA, porcFactB], name: '% Rechazo', yaxis: 'y2', type: 'scatter', mode: 'lines+markers' }
             ], { yaxis: {title: 'Volumen'}, yaxis2: {overlaying: 'y', side: 'right'} });
 
             // 4. Motivos
             let motMap = {};
-            devMesA.forEach(r => { let m = (r['MOTIVO'] || '').toString().trim(); if(m && m !== '0') { motMap[m] = (motMap[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
+            devAmbosMeses.forEach(r => { let m = (r['MOTIVO'] || '').toString().trim(); if(m && m !== '0') { motMap[m] = (motMap[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
             let topM = Object.keys(motMap).sort((a,b) => motMap[b] - motMap[a]).slice(0,6).reverse();
             Plotly.newPlot('chart-motivos', [{ y: topM, x: topM.map(m => motMap[m]), type: 'bar', orientation: 'h' }], { title: 'Top 6 Motivos', margin: { l: 150 } });
 
             // 5. Productos
             let prodMap = {};
-            devMesA.forEach(r => { let p = (r['PRODUCTO'] || '').toString().trim(); if(p && p !== '0') { prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
-            let topP = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0,5).reverse();
+            devAmbosMeses.forEach(r => { let p = (r['PRODUCTO'] || '').toString().trim(); if(p && p !== '0') { prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); } });
+            let topP = Object.keys(prodMap).sort((a,b) => prodMap[b] - motMap[a]).slice(0,5).reverse();
             Plotly.newPlot('chart-productos', [{ y: topP, x: topP.map(p => prodMap[p]), type: 'bar', orientation: 'h' }], { title: 'Top 5 Productos', margin: { l: 200 } });
 
             // 8. Flota
             let transMap = {}, chofMap = {};
-            devMesA.forEach(r => {
+            devAmbosMeses.forEach(r => {
                 let t = (r['TRANSPORTE'] || '').toString().trim(); let c = (r['CHOFER'] || '').toString().trim();
                 if(t && t !== '0') transMap[t] = (transMap[t] || 0) + 1;
                 if(c && c !== '0') chofMap[c] = (chofMap[c] || 0) + 1;
