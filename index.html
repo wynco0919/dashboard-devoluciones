@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Wynco | Dashboard Gerencial de Devoluciones 2026</title>
+    <title>Wynco | Dashboard Operativo de Devoluciones 2026</title>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -10,7 +10,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--dark); }
         .header { background: var(--primary); color: white; padding: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .selector-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 20px; align-items: center; }
-        select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; color: var(--dark); font-weight: bold; }
+        select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; color: var(--dark); font-weight: bold; cursor: pointer; }
         .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; }
         .value { font-size: 1.9em; font-weight: bold; margin: 8px 0; color: var(--primary); }
@@ -26,16 +26,16 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones</h1>
-        <div id="status">Sincronizando con bases de datos...</div>
+        <div id="status">Conectando con repositorios centrales...</div>
     </div>
 
     <div class="selector-box">
         <div>
-            <label for="mesA" style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
+            <label Gauges style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
             <select id="mesA" onchange="actualizarDashboard()"></select>
         </div>
         <div>
-            <label for="mesB" style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
+            <label style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
             <select id="mesB" onchange="actualizarDashboard()"></select>
         </div>
     </div>
@@ -50,11 +50,11 @@
             <div id="val-cajas-B" class="value">0</div>
         </div>
         <div class="card">
-            <h3>Variación Volumen</h3>
+            <h3>Variación Física</h3>
             <div id="trend-comparativo" class="trend">--</div>
         </div>
         <div class="card">
-            <h3>Cajas Procesadas (Suma A+B)</h3>
+            <h3>Total Cajas Devueltas (Suma A+B)</h3>
             <div id="total-vol" class="value">0</div>
         </div>
     </div>
@@ -85,14 +85,16 @@
                     fetch(URL_DEV).then(res => res.text())
                 ]);
 
-                const normalizar = (h) => h.trim().toUpperCase();
-                BD_DESPACHOS = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizar}).data;
+                // Normalización agresiva de textos y cabeceras para eliminar espacios ocultos de Excel
+                const normalizarTexto = (txt) => txt ? txt.toString().trim().toUpperCase().replace(/[\r\n]+/g, "") : "";
+
+                BD_DESPACHOS = Papa.parse(rDes, {header:true, skipEmptyLines:true, delimiter:";", transformHeader: normalizarTexto}).data;
                 
                 let rawDev = rDev.trim();
                 if (rawDev.startsWith("1,2,3") || rawDev.startsWith("1;2;3")) {
                     rawDev = rawDev.substring(rawDev.indexOf("\n") + 1);
                 }
-                BD_DEVOLUCIONES = Papa.parse(rawDev, {header:true, skipEmptyLines:true, transformHeader: normalizar}).data;
+                BD_DEVOLUCIONES = Papa.parse(rawDev, {header:true, skipEmptyLines:true, transformHeader: normalizarTexto}).data;
 
                 const selectorA = document.getElementById('mesA');
                 const selectorB = document.getElementById('mesB');
@@ -106,7 +108,7 @@
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
-                document.getElementById('status').innerText = "Error leyendo archivos de GitHub.";
+                document.getElementById('status').innerText = "Error crítico de enlace.";
             }
         }
 
@@ -117,7 +119,7 @@
             document.getElementById('lbl-cajas-A').innerText = `Cajas ${mesA}`;
             document.getElementById('lbl-cajas-B').innerText = `Cajas ${mesB}`;
 
-            // Corrección de filtrado por texto estricto
+            // Filtrado con limpieza de espacios en tiempo real para evitar fallas por strings corruptos
             const devMesA = BD_DEVOLUCIONES.filter(r => (r['MES'] || '').toString().trim().toUpperCase() === mesA);
             const devMesB = BD_DEVOLUCIONES.filter(r => (r['MES'] || '').toString().trim().toUpperCase() === mesB);
             const devAmbosMeses = [...devMesA, ...devMesB];
@@ -141,46 +143,49 @@
 
             const layoutBase = { automargin: true, margin: { l: 50, r: 40, t: 60, b: 60 } };
 
-            // 1. MOTIVOS COMPARTIDOS
+            // 1. MOTIVOS COMPARTIDOS POR MES (Top 6 interactivo)
             let motMapA = {}, motMapB = {};
-            devMesA.forEach(r => { let m = (r['MOTIVO'] || 'OTROS').trim(); motMapA[m] = (motMapA[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
-            devMesB.forEach(r => { let m = (r['MOTIVO'] || 'OTROS').trim(); motMapB[m] = (motMapB[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
-            let top6Motivos = [...new Set([...Object.keys(motMapA), ...Object.keys(motMapB)])].slice(0,6);
+            devMesA.forEach(r => { let m = (r['MOTIVO'] || 'OTROS').toString().trim(); if(m && m !== '0') motMapA[m] = (motMapA[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            devMesB.forEach(r => { let m = (r['MOTIVO'] || 'OTROS').toString().trim(); if(m && m !== '0') motMapB[m] = (motMapB[m] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            let top6Motivos = [...new Set([...Object.keys(motMapA), ...Object.keys(motMapB)])].sort((a,b) => ((motMapA[b]||0)+(motMapB[b]||0)) - ((motMapA[a]||0)+(motMapB[a]||0))).slice(0,6);
 
             Plotly.newPlot('chart-motivos', [
                 { x: top6Motivos, y: top6Motivos.map(m => motMapA[m]||0), name: mesA, type: 'bar', marker: {color: '#1f77b4'} },
                 { x: top6Motivos, y: top6Motivos.map(m => motMapB[m]||0), name: mesB, type: 'bar', marker: {color: '#aec7e8'} }
             ], Object.assign({}, layoutBase, { barmode: 'group', title: 'Top 6 Motivo de las Devoluciones por Mes' }));
 
-            // 2. PRODUCTOS
+            // 2. PRODUCTOS (Top 5 dinámico sin vacíos)
             let prodMap = {};
-            devAmbosMeses.forEach(r => { let p = (r['PRODUCTO'] || 'S/D').trim(); prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            devAmbosMeses.forEach(r => { let p = (r['PRODUCTO'] || 'S/D').toString().trim(); if(p && p !== '0') prodMap[p] = (prodMap[p] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
             let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, 5).reverse();
-            Plotly.newPlot('chart-productos', [{ y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', marker: {color: '#3182bd'} }], Object.assign({}, layoutBase, { title: 'Cantidad de Cajas Devueltas por Producto', margin: { l: 200 } }));
+            Plotly.newPlot('chart-productos', [{ y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', marker: {color: '#3182bd'} }], Object.assign({}, layoutBase, { title: 'Cantidad de Cajas Devueltas por Producto', margin: { l: 220 } }));
 
-            // 3. ESTADOS (Muestra Nombre + Porcentaje adentro de la porción)
+            // 3. ESTADOS (Muestra Nombre + Porcentaje adentro de la porción, Top 6)
             let edoMap = {};
-            devAmbosMeses.forEach(r => { let e = (r['ESTADO'] || 'S/D').trim(); edoMap[e] = (edoMap[e] || 0) + 1; });
+            devAmbosMeses.forEach(r => { let e = (r['ESTADO'] || 'S/D').toString().trim(); if(e && e !== '0') edoMap[e] = (edoMap[e] || 0) + 1; });
             let edosLabels = Object.keys(edoMap).sort((a,b) => edoMap[b] - edoMap[a]).slice(0, 6);
-            Plotly.newPlot('chart-estados', [{ labels: edosLabels, values: edosLabels.map(e => edoMap[e]), type: 'pie', textinfo: 'label+percent', textposition: 'inside' }], { title: '% Devoluciones por Estado', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
+            Plotly.newPlot('chart-estados', [{ labels: edosLabels, values: edosLabels.map(e => edoMap[e]), type: 'pie', textinfo: 'label+percent', textposition: 'inside', hole: 0.35 }], { title: 'Top 6 % Devoluciones por Estado', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
 
-            // 4. RESPONSABLES
+            // 4. RESPONSABLES (Top 6 basado en suma de Cajas Reales de Excel)
             let respMap = {};
-            devAmbosMeses.forEach(r => { let re = (r['RESPONSABLE'] || 'S/D').trim(); respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            devAmbosMeses.forEach(r => { let re = (r['RESPONSABLE'] || 'S/D').toString().trim(); if(re && re !== '0') respMap[re] = (respMap[re] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
             let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0, 6);
-            Plotly.newPlot('chart-responsables', [{ x: topResp, y: topResp.map(re => respMap[re]), type: 'bar', marker: {color: '#003366'} }], Object.assign({}, layoutBase, { title: 'Top 6 Devoluciones por Responsable (Cajas)' }));
+            Plotly.newPlot('chart-responsables', [{ labels: topResp, values: topResp.map(re => respMap[re]), type: 'pie', textinfo: 'label+percent', textposition: 'inside', hole: 0.35 }], { title: 'Top 6 Responsables (Cajas)', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
 
-            // 5. FACTURAS DESPACHADAS VS DEVUELTAS
+            // 5. CONCATENACIÓN OPERATIVA: FACTURAS EMITIDAS (DESPACHOS) VS NOTAS DEVUELTAS
             const desMesA = BD_DESPACHOS.find(r => (r['MES'] || '').toString().trim().toUpperCase() === mesA);
             const desMesB = BD_DESPACHOS.find(r => (r['MES'] || '').toString().trim().toUpperCase() === mesB);
             const fDespA = parseFloat(desMesA ? desMesA['FACTURAS DESPACHADAS'] : 0);
             const fDespB = parseFloat(desMesB ? desMesB['FACTURAS DESPACHADAS'] : 0);
-            const fDevA = parseFloat(desMesA ? desMesA['FACTURAS DEVUELTAS'] : 0);
-            const fDevB = parseFloat(desMesB ? desMesB['FACTURAS DEVUELTAS'] : 0);
+            
+            // Contamos facturas únicas devueltas directo desde la base de datos de control
+            const fDevA = [...new Set(devMesA.map(r => r['FACTURA / NOTA2']))].filter(Boolean).length;
+            const fDevB = [...new Set(devMesB.map(r => r['FACTURA / NOTA2']))].filter(Boolean).length;
+
             Plotly.newPlot('chart-facturas-doble-eje', [
-                { x: [mesA, mesB], y: [fDespA, fDespB], name: 'Despachadas', type: 'bar' },
-                { x: [mesA, mesB], y: [fDevA, fDevB], name: 'Devueltas', type: 'bar' }
-            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'Facturas Despachadas vs Devueltas' }));
+                { x: [mesA, mesB], y: [fDespA, fDespB], name: 'Facturas Emitidas (Rutas)', type: 'bar', marker: {color: '#95a5a6'} },
+                { x: [mesA, mesB], y: [fDevA, fDevB], name: 'Notas Devueltas', type: 'bar', marker: {color: '#e74c3c'} }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'Concatenación Operativa: Rutas vs Devoluciones' }));
 
             // 6. CIERRE
             let normalCajas = 0, cierreCajas = 0;
@@ -189,19 +194,19 @@
                 if(comentario.includes('FIN DE MES')) cierreCajas += parseFloat(r['CANT CAJA DEV'] || 0);
                 else normalCajas += parseFloat(r['CANT CAJA DEV'] || 0);
             });
-            Plotly.newPlot('chart-cierre-mes', [{ labels: ['Venta Normal', 'Venta Fin de Mes'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4 }], { title: 'Cajas Devueltas Normal vs Fin de Mes', legend: { orientation: 'h', y: -0.1 } });
+            Plotly.newPlot('chart-cierre-mes', [{ labels: ['Venta Normal', 'Venta Fin de Mes'], values: [normalCajas, cierreCajas], type: 'pie', hole: 0.4, marker: {colors: ['#003366', '#e74c3c']} }], { title: 'Cajas Devueltas Normal vs Fin de Mes', legend: { orientation: 'h', y: -0.1 } });
 
             // 7. PARTICIPACIÓN ANUAL
             const granTotalAnual = BD_DEVOLUCIONES.reduce((sum, r) => sum + parseFloat(r['CANT CAJA DEV'] || 0), 0) || 1;
-            Plotly.newPlot('chart-participacion-anual', [{ x: [mesA, mesB], y: [(cajasDevA/granTotalAnual)*100, (cajasDevB/granTotalAnual)*100], type: 'bar' }], { title: '% Representación sobre el Total Anual 2026' });
+            Plotly.newPlot('chart-participacion-anual', [{ x: [mesA, mesB], y: [(cajasDevA/granTotalAnual)*100, (cajasDevB/granTotalAnual)*100], type: 'bar', marker: {color: '#34495e'} }], { title: '% Representación sobre el Total Anual 2026' });
 
             // 8. FLOTA
             let transMap = {};
-            devAmbosMeses.forEach(r => { let t = (r['TRANSPORTE'] || 'S/D').trim(); transMap[t] = (transMap[t] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
+            devAmbosMeses.forEach(r => { let t = (r['TRANSPORTE'] || 'S/D').toString().trim(); if(t && t !== '0') transMap[t] = (transMap[t] || 0) + parseFloat(r['CANT CAJA DEV'] || 0); });
             let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, 5);
             Plotly.newPlot('chart-flota', [{ x: topTrans, y: topTrans.map(t => transMap[t]), type: 'bar', marker: {color: '#e67e22'} }], { title: 'Top Transportes por Cajas Devueltas' });
 
-            document.getElementById('status').innerText = "Dashboard Sincronizado: " + new Date().toLocaleTimeString();
+            document.getElementById('status').innerText = "Dashboard Operativo Sincronizado: " + new Date().toLocaleTimeString();
         }
 
         window.onload = inicializar;
