@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Wynco | Indicador de Devoluciones 2026</title>
+    <title>Wynco | Inteligencia Operativa de Devoluciones 2026</title>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -18,8 +18,13 @@
         .trend.mejora { color: #27ae60; background: #ebf7ee; border: 1px solid #27ae60; }
         .trend.desmejora { color: var(--danger); background: #fff5f5; border: 1px solid var(--danger); }
         
-        /* Formato idéntico al Excel: 3 columnas de gráficas */
-        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 15px; }
+        /* Malla de Distribución Estilo Excel */
+        .charts-row-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .charts-row-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        @media (min-width: 1400px) {
+            .charts-row-3 { grid-template-columns: repeat(3, 1fr); }
+            .charts-row-4 { grid-template-columns: repeat(4, 1fr); }
+        }
         .chart-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-height: 400px; border: 1px solid #c8d6e5; border-top: 4px solid #a4b0be; }
     </style>
 </head>
@@ -27,7 +32,7 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones</h1>
-        <div id="status">Sincronizando y cruzando datos en la nube...</div>
+        <div id="status">Sincronizando Malla Analítica...</div>
     </div>
 
     <div class="selector-box">
@@ -75,16 +80,23 @@
         </div>
     </div>
 
-    <!-- Malla de Gráficos Idéntica a Excel -->
-    <div class="charts-grid">
+    <!-- Nivel 1 -->
+    <div class="charts-row-3">
         <div class="chart-box"><div id="chart-motivos"></div></div>
         <div class="chart-box"><div id="chart-productos"></div></div>
         <div class="chart-box"><div id="chart-estados"></div></div>
-        
+    </div>
+    
+    <!-- Nivel 2: Inclusión de Gráfica de Faltantes -->
+    <div class="charts-row-4">
         <div class="chart-box"><div id="chart-responsables"></div></div>
         <div class="chart-box"><div id="chart-transporte"></div></div>
         <div class="chart-box"><div id="chart-chofer"></div></div>
-        
+        <div class="chart-box"><div id="chart-faltantes"></div></div>
+    </div>
+    
+    <!-- Nivel 3 -->
+    <div class="charts-row-3">
         <div class="chart-box"><div id="chart-facturas"></div></div>
         <div class="chart-box"><div id="chart-cierre"></div></div>
         <div class="chart-box"><div id="chart-participacion"></div></div>
@@ -100,35 +112,44 @@
         const mesesNumStr = { "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04", "MAYO": "05", "JUNIO": "06", "JULIO": "07" };
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO"];
 
-        // 🛡️ LECTOR POR COORDENADAS: Ignora nombres y extrae la matriz de Excel directo de su posición.
+        // Limpiador Numérico Experto: Convierte "3.353" en 3353 y "1,5" en 1.5
+        function parsearNumero(val) {
+            if (!val) return 0;
+            let str = val.toString().trim();
+            str = str.replace(/\./g, '').replace(',', '.');
+            let n = parseFloat(str.replace(/[^0-9.-]/g, ''));
+            return isNaN(n) ? 0 : n;
+        }
+
         function parsearDataPorCoordenadas(textoRaw) {
             let limpio = textoRaw.replace(/^\uFEFF/, "").trim();
             let primeraLinea = limpio.split('\n')[0] || '';
             let sep = (primeraLinea.match(/;/g) || []).length > (primeraLinea.match(/,/g) || []).length ? ';' : ',';
-            
             let parsed = Papa.parse(limpio, { header: false, skipEmptyLines: true, delimiter: sep });
-            return parsed.data.slice(1); // Desechamos la fila 0 (Títulos rotos)
+            return parsed.data.slice(1);
         }
 
         async function inicializar() {
             try {
                 const [rDes, rDev] = await Promise.all([ fetch(URL_DES).then(r => r.text()), fetch(URL_DEV).then(r => r.text()) ]);
                 
-                // Mapeo Estricto Devoluciones según la estructura real
+                // Mapeo Estricto Devoluciones
                 BD_DEVOLUCIONES = parsearDataPorCoordenadas(rDev).map(r => {
                     if (r.length < 25) return null;
                     return {
                         factura: (r[0] || '').trim().toUpperCase(),
-                        fechaFact: (r[6] || '').trim(),                 // Coord 6: Fecha de Factura (Base del Excel)
-                        mesCol: (r[3] || '').trim(),                    // Coord 3: Mes (Respaldo)
-                        producto: (r[10] || 'S/D').trim().toUpperCase(),// Coord 10: Descripción del Producto (Estándar)
-                        cajas: parseFloat((r[13] || '').replace(',', '.')) || 0, // Coord 13: Cajas Devueltas Numéricas
-                        chofer: (r[19] || 'S/D').trim().toUpperCase(),  // Coord 19: Chofer
-                        transporte: (r[20] || 'S/D').trim().toUpperCase(),// Coord 20: Transporte
-                        motivo: (r[21] || 'OTROS').trim().toUpperCase(), // Coord 21: Motivo
-                        responsable: (r[23] || 'S/D').trim().toUpperCase(),// Coord 23: Responsable (ZONA según header pero guarda responsable)
-                        estado: (r[26] || 'S/D').trim().toUpperCase(),  // Coord 26: Estado
-                        cierre: (r[32] || 'NORMAL').trim().toUpperCase() // Coord 32: Tipo de Cierre
+                        fechaFact: (r[6] || '').trim(),                 
+                        mesCol: (r[3] || '').trim(),                    
+                        producto: (r[10] || 'S/D').trim().toUpperCase(),
+                        cajas: parsearNumero(r[13]), 
+                        disp: parsearNumero(r[14]), // Coord 14: Displays
+                        und: parsearNumero(r[15]),  // Coord 15: Unidades
+                        chofer: (r[19] || 'S/D').trim().toUpperCase(),  
+                        transporte: (r[20] || 'S/D').trim().toUpperCase(),
+                        motivo: (r[21] || 'OTROS').trim().toUpperCase(), 
+                        responsable: (r[23] || 'S/D').trim().toUpperCase(),
+                        estado: (r[26] || 'S/D').trim().toUpperCase(),  
+                        cierre: (r[32] || 'NORMAL').trim().toUpperCase() 
                     };
                 }).filter(Boolean);
 
@@ -137,8 +158,8 @@
                     if (r.length < 3) return null;
                     return {
                         mes: (r[0] || '').trim().toUpperCase(),
-                        cajasDespachadas: parseFloat((r[2] || '').replace(',', '.')) || 0,
-                        facturasDespachadas: parseFloat((r[3] || '').replace(',', '.')) || 0
+                        cajasDespachadas: parsearNumero(r[2]),
+                        facturasDespachadas: parsearNumero(r[3])
                     };
                 }).filter(Boolean);
 
@@ -149,7 +170,6 @@
             }
         }
 
-        // Motor de Fechas (Iguala la tabla dinámica del Excel)
         function esMesDevolucion(fila, mesTexto) {
             let numStr = mesesNumStr[mesTexto];
             if (fila.fechaFact && fila.fechaFact.includes('/')) {
@@ -166,7 +186,6 @@
             document.getElementById('lbl-cajas-A').innerText = mesA;
             document.getElementById('lbl-cajas-B').innerText = mesB;
 
-            // Segmentación
             const devA = BD_DEVOLUCIONES.filter(r => esMesDevolucion(r, mesA));
             const devB = BD_DEVOLUCIONES.filter(r => esMesDevolucion(r, mesB));
             const devAmbos = [...devA, ...devB];
@@ -189,12 +208,12 @@
                 trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
             }
 
-            // Configuraciones de Diseño (Colores corporativos idénticos al Excel)
             const cBlue = '#4472c4';
             const cOrange = '#ed7d31';
             const fontConfig = { size: 9.5, color: '#2c3e50' };
-            const layoutBase = { automargin: true, margin: { l: 40, r: 40, t: 50, b: 60 }, xaxis: { tickfont: fontConfig }, yaxis: { tickfont: fontConfig }, showlegend: true, legend: {orientation: "h", y: -0.2} };
-            const layoutH = { automargin: true, margin: { l: 200, r: 25, t: 50, b: 50 }, xaxis: { tickfont: fontConfig }, yaxis: { tickfont: {size: 8.5} }, showlegend: false };
+            const layoutBase = { automargin: true, margin: { l: 40, r: 40, t: 50, b: 50 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: fontConfig, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.2} };
+            const layoutHNoLegend = { automargin: true, margin: { l: 150, r: 50, t: 50, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, cliponaxis: false }, showlegend: false };
+            const layoutHLegend = { automargin: true, margin: { l: 150, r: 50, t: 50, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
             // 1. MOTIVO DE LAS DEVOLUCIONES POR MES
@@ -205,9 +224,9 @@
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0,6);
 
             Plotly.newPlot('chart-motivos', [
-                { x: topMotivos, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', marker: {color: cBlue} },
-                { x: topMotivos, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', marker: {color: cOrange} }
-            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'TOP 6: MOTIVO DE LAS DEVOLUCIONES POR MES' }));
+                { x: topMotivos, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
+                { x: topMotivos, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 12}} }));
 
             // =======================================================
             // 2. CANTIDAD DE CAJAS DEVUELTAS X TIPO PRODUCTO
@@ -216,39 +235,42 @@
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
             let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, 6).reverse();
             Plotly.newPlot('chart-productos', [{ 
-                y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', text: topProds.map(p => Math.round(prodMap[p])), textposition: 'outside', marker: {color: cBlue} 
-            }], Object.assign({}, layoutH, { title: 'CANTIDAD DE CAJAS DEVUELTAS X TIPO PRODUCTO' }));
+                y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', text: topProds.map(p => Math.round(prodMap[p])), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} 
+            }], Object.assign({}, layoutHNoLegend, { title: {text: 'CAJAS DEVUELTAS X PRODUCTO', font: {size: 12}} }));
 
             // =======================================================
-            // 3. % DEVOLUCIONES POR ESTADO
+            // 3. % DEVOLUCIONES POR ESTADO (Ahora muestra valor real y %)
             // =======================================================
             let edoMap = {};
             devAmbos.forEach(r => { if(r.estado.includes("EDO")) edoMap[r.estado] = (edoMap[r.estado]||0) + r.cajas; });
             let edosLabels = Object.keys(edoMap).sort((a,b) => edoMap[b] - edoMap[a]).slice(0,6);
-            Plotly.newPlot('chart-estados', [{ labels: edosLabels, values: edosLabels.map(e => edoMap[e]), type: 'pie', textinfo: 'percent+label', hole: 0.3 }], { title: '% DEVOLUCIONES POR ESTADO', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
+            Plotly.newPlot('chart-estados', [{ 
+                labels: edosLabels, values: edosLabels.map(e => edoMap[e]), type: 'pie', textinfo: 'label+value+percent', textposition: 'outside', textfont: { size: 10 }, hole: 0.3 
+            }], { title: {text: '% DEVOLUCIONES POR ESTADO', font: {size: 12}}, showlegend: false, margin: { l: 20, r: 20, t: 50, b: 20 } });
 
             // =======================================================
-            // 4. TOP 6: DEVOLUCIONES POR RESPONSABLE (Barra y Línea)
+            // 4. TOP 6: DEVOLUCIONES POR RESPONSABLE (Barra + Porcentaje)
             // =======================================================
             let respMap = {};
             devAmbos.forEach(r => { if(!r.responsable.includes("EDO") && isNaN(r.responsable) && r.responsable !== 'S/D') respMap[r.responsable] = (respMap[r.responsable]||0) + r.cajas; });
             let totalRespCajas = Object.values(respMap).reduce((s,v)=>s+v,0) || 1;
             let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
 
+            let respText = topResp.map(re => Math.round(respMap[re]) + ' (' + Math.round((respMap[re]/totalRespCajas)*100) + '%)');
             Plotly.newPlot('chart-responsables', [
-                { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: topResp.map(re => Math.round(respMap[re])), textposition: 'auto', marker: {color: cBlue} },
-                { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% POR RESPONSABLE', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', text: topResp.map(re => Math.round((respMap[re]/totalRespCajas)*100)+'%'), textposition: 'top right', line: {color: cOrange, width: 3} }
-            ], Object.assign({}, layoutBase, { title: 'TOP 6: DEVOLUCIONES POR RESPONSABLE', yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false } }));
+                { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: respText, textposition: 'auto', cliponaxis: false, marker: {color: cBlue} },
+                { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% POR RESPONSABLE', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', text: topResp.map(re => Math.round((respMap[re]/totalRespCajas)*100)+'%'), textposition: 'top center', cliponaxis: false, line: {color: cOrange, width: 3} }
+            ], Object.assign({}, layoutBase, { title: {text: 'TOP 6: RESPONSABLES', font: {size: 12}}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false } }));
 
             // =======================================================
-            // 5. TOP 6: DEVOLUCIONES POR TRANSPORTE
+            // 5. TOP 6: DEVOLUCIONES POR TRANSPORTE (Solucionado corte)
             // =======================================================
             let transMap = {};
             devAmbos.forEach(r => { if(!r.transporte.includes("EDO") && isNaN(r.transporte) && r.transporte !== 'S/D') transMap[r.transporte] = (transMap[r.transporte]||0) + r.cajas; });
             let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, 6).reverse();
             Plotly.newPlot('chart-transporte', [{ 
-                y: topTrans, x: topTrans.map(t => transMap[t]), type: 'bar', orientation: 'h', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'outside', marker: {color: cOrange} 
-            }], Object.assign({}, layoutH, { title: 'TOP 6: DEVOLUCIONES POR TRANSPORTE' }));
+                y: topTrans, x: topTrans.map(t => transMap[t]), type: 'bar', orientation: 'h', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'outside', cliponaxis: false, marker: {color: '#8e44ad'} 
+            }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: TRANSPORTE', font: {size: 12}} }));
 
             // =======================================================
             // 6. TOP 6: DEVOLUCIONES POR CHOFER
@@ -257,48 +279,72 @@
             devAmbos.forEach(r => { if(!r.chofer.includes("EDO") && isNaN(r.chofer) && r.chofer !== 'S/D') choferMap[r.chofer] = (choferMap[r.chofer]||0) + r.cajas; });
             let topChofer = Object.keys(choferMap).sort((a,b) => choferMap[b] - choferMap[a]).slice(0, 6).reverse();
             Plotly.newPlot('chart-chofer', [{ 
-                y: topChofer, x: topChofer.map(c => choferMap[c]), type: 'bar', orientation: 'h', text: topChofer.map(c => Math.round(choferMap[c])), textposition: 'outside', marker: {color: cOrange} 
-            }], Object.assign({}, layoutH, { title: 'TOP 6: DEVOLUCIONES POR CHOFER' }));
+                y: topChofer, x: topChofer.map(c => choferMap[c]), type: 'bar', orientation: 'h', text: topChofer.map(c => Math.round(choferMap[c])), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} 
+            }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: CHOFER', font: {size: 12}} }));
 
             // =======================================================
-            // 7. FACTURAS DESPACHADAS Vs FACTURAS DEVUELTAS (Enero a Julio)
+            // 7. LA NUEVA GRÁFICA: DEVOLUCIONES POR FALTANTE (Disp/Und)
+            // =======================================================
+            let faltMap = {};
+            devAmbos.forEach(r => { 
+                if(r.motivo === 'FALTANTE' && r.producto !== 'S/D') {
+                    if(!faltMap[r.producto]) faltMap[r.producto] = {disp: 0, und: 0};
+                    faltMap[r.producto].disp += r.disp;
+                    faltMap[r.producto].und += r.und;
+                }
+            });
+            let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0,6).reverse();
+
+            Plotly.newPlot('chart-faltantes', [
+                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => Math.round(faltMap[p].disp)), textposition: 'inside', marker: {color: cOrange} },
+                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Unidades', type: 'bar', orientation: 'h', text: topFalt.map(p => Math.round(faltMap[p].und)), textposition: 'inside', marker: {color: cBlue} }
+            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: DEVOLUCIÓN POR FALTANTE', font: {size: 12}} }));
+
+            // =======================================================
+            // 8. FACTURAS DESPACHADAS Vs FACTURAS DEVUELTAS
             // =======================================================
             let fDespArr = mesesLista.map(m => { let d = BD_DESPACHOS.find(x => x.mes === m); return d ? d.facturasDespachadas : 0; });
-            let fDevPctArr = mesesLista.map((m, i) => {
+            let fDevArr = mesesLista.map(m => {
                 let devM = BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m));
-                let fUnicas = new Set(devM.map(x => x.factura).filter(x => x && x !== 'S/D')).size;
-                return fDespArr[i] > 0 ? (fUnicas / fDespArr[i]) : 0;
+                return new Set(devM.map(x => x.factura).filter(x => x && x !== 'S/D')).size;
             });
+            let fDevPctArr = fDevArr.map((v, i) => fDespArr[i] > 0 ? (v / fDespArr[i]) : 0);
+
+            // Etiqueta con valor absoluto + Porcentaje para el usuario
+            let devText = fDevArr.map((v, i) => v + ' notas (' + Math.round(fDevPctArr[i]*100) + '%)');
 
             Plotly.newPlot('chart-facturas', [
-                { x: mesesLista, y: fDespArr, name: 'Facturas Despachadas', type: 'bar', text: fDespArr.map(v=>Math.round(v)), textposition: 'auto', marker: {color: cBlue} },
-                { x: mesesLista, y: fDevPctArr, name: '% Notas Devueltas', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', text: fDevPctArr.map(v=>Math.round(v*100)+'%'), textposition: 'top center', line: {color: cOrange, width: 3} }
-            ], Object.assign({}, layoutBase, { title: 'FACTURAS DESPACHADAS Vs FACTURAS DEVUELTAS', yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false } }));
+                { x: mesesLista, y: fDespArr, name: 'Facturas Despachadas', type: 'bar', text: fDespArr.map(v=>Math.round(v)), textposition: 'auto', cliponaxis: false, marker: {color: cBlue} },
+                { x: mesesLista, y: fDevPctArr, name: '% Notas Devueltas', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: devText, textposition: 'top center', cliponaxis: false, line: {color: cOrange, width: 3} }
+            ], Object.assign({}, layoutBase, { title: {text: 'FACTURAS DESPACHADAS Vs DEVUELTAS', font: {size: 12}}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false } }));
 
             // =======================================================
-            // 8. CANTIDAD DE CAJAS DEVUELTAS NORMAL Vs FIN DE MES
+            // 9. CANTIDAD DE CAJAS DEVUELTAS NORMAL Vs FIN DE MES
             // =======================================================
             let cierreArr = mesesLista.map(m => BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m) && x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
             let normArr = mesesLista.map(m => BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m) && !x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
 
             Plotly.newPlot('chart-cierre', [
-                { x: mesesLista, y: cierreArr, name: 'Cajas Devolución Fin de Mes', type: 'bar', text: cierreArr.map(v=>v>0?Math.round(v):''), textposition: 'inside', marker: {color: cOrange} },
-                { x: mesesLista, y: normArr, name: 'Cajas Devolución Normal', type: 'bar', text: normArr.map(v=>v>0?Math.round(v):''), textposition: 'inside', marker: {color: cBlue} }
-            ], Object.assign({}, layoutBase, { barmode: 'stack', title: 'CANTIDAD DE CAJAS DEVUELTAS NORMAL Vs FIN DE MES' }));
+                { x: mesesLista, y: normArr, name: 'Venta Normal', type: 'bar', text: normArr.map(v=>v>0?Math.round(v):''), textposition: 'inside', marker: {color: cBlue} },
+                { x: mesesLista, y: cierreArr, name: 'Fin de Mes', type: 'bar', text: cierreArr.map(v=>v>0?Math.round(v):''), textposition: 'inside', marker: {color: cOrange} }
+            ], Object.assign({}, layoutBase, { barmode: 'stack', title: {text: 'CAJAS: VENTA NORMAL Vs FIN DE MES', font: {size: 12}} }));
 
             // =======================================================
-            // 9. CANTIDAD DE CAJAS DEVUELTAS MES / TOTAL GENERAL
+            // 10. CAJAS DEVUELTAS MES / TOTAL GENERAL (Con Porcentajes)
             // =======================================================
             let totalAnual = BD_DEVOLUCIONES.reduce((s,x)=>s+x.cajas,0) || 1;
             let cajasMesArr = mesesLista.map(m => BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m)).reduce((s,x)=>s+x.cajas,0));
             let pctMesArr = cajasMesArr.map(v => v / totalAnual);
 
-            Plotly.newPlot('chart-participacion', [
-                { x: mesesLista, y: cajasMesArr, name: 'Cajas Devueltas Mes', type: 'bar', text: cajasMesArr.map(v=>v>0?Math.round(v):''), textposition: 'auto', marker: {color: cBlue} },
-                { x: mesesLista, y: pctMesArr, name: '% Devolución Mensual', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', text: pctMesArr.map(v=>Math.round(v*100)+'%'), textposition: 'top center', line: {color: cOrange, width: 3} }
-            ], Object.assign({}, layoutBase, { title: 'CANTIDAD DE CAJAS DEVUELTAS MES / TOTAL GENERAL', yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false, range: [0, Math.max(...pctMesArr)*1.3] } }));
+            // Texto enriquecido para mostrar cantidad real + %
+            let cajasText = cajasMesArr.map((v, i) => v > 0 ? Math.round(v) + ' (' + Math.round(pctMesArr[i]*100) + '%)' : '');
 
-            document.getElementById('status').innerText = "Dashboard Analítico Calibrado al 100% con Excel.";
+            Plotly.newPlot('chart-participacion', [
+                { x: mesesLista, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
+                { x: mesesLista, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', text: pctMesArr.map(v=>Math.round(v*100)+'%'), textposition: 'top center', cliponaxis: false, line: {color: cOrange, width: 3} }
+            ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS MES / TOTAL GENERAL', font: {size: 12}}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false, range: [0, Math.max(...pctMesArr)*1.3] } }));
+
+            document.getElementById('status').innerText = "Dashboard Analítico Calibrado y Optimizado al 100%.";
         }
 
         window.onload = inicializar;
