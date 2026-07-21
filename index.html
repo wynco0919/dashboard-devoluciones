@@ -25,7 +25,7 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones y Traslados</h1>
-        <div id="status">Iniciando motor de integración de datos...</div>
+        <div id="status">Conectando con bases de datos centralizadas...</div>
     </div>
 
     <div class="selector-box">
@@ -69,19 +69,23 @@
             <div id="trend-comparativo" class="trend">--</div>
         </div>
         <div class="card">
-            <h3>Cantidad de Cajas Procesadas</h3>
+            <h3>Total Cajas Devueltas (A+B)</h3>
             <div id="total-vol" class="value">0</div>
         </div>
     </div>
 
     <div class="charts-grid">
+        <!-- Fila 1 -->
         <div class="chart-box"><div id="chart-motivos"></div></div>
         <div class="chart-box"><div id="chart-productos"></div></div>
+        <!-- Fila 2 -->
         <div class="chart-box"><div id="chart-estados"></div></div>
         <div class="chart-box"><div id="chart-responsables"></div></div>
-        <div class="chart-box"><div id="chart-concatenacion"></div></div>
+        <!-- Fila 3: Concatenación Operativa Solicitada -->
+        <div class="chart-box"><div id="chart-concat-facturas"></div></div>
+        <div class="chart-box"><div id="chart-concat-cajas"></div></div>
+        <!-- Fila 4 -->
         <div class="chart-box"><div id="chart-cierre-mes"></div></div>
-        <div class="chart-box"><div id="chart-participacion-anual"></div></div>
         <div class="chart-box"><div id="chart-flota"></div></div>
     </div>
 
@@ -92,53 +96,33 @@
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
         
-        const mesesMap = { "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12 };
-        const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO"];
+        const mesesNum = { "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6, "JULIO": 7 };
 
-        // 🛡️ MOTOR ANTI-DESPLAZAMIENTO: Analiza el texto crudo y define el separador matemáticamente
-        function parsearCSVBlindado(textoCrudo) {
-            let lineas = textoCrudo.trim().split('\n');
-            if (lineas.length === 0) return [];
+        // 🛡️ PARSER BLINDADO: Fuerza el punto y coma y sanitiza todas las llaves
+        function parsearDataBlindada(csvText) {
+            let limpio = csvText.replace(/^\uFEFF/, "").trim();
             
-            let primeraLinea = lineas[0];
-            let cantPuntoComa = (primeraLinea.match(/;/g) || []).length;
-            let cantComa = (primeraLinea.match(/,/g) || []).length;
-            let separadorReal = cantPuntoComa > cantComa ? ';' : ',';
-
-            let parseado = Papa.parse(textoCrudo.trim(), {
+            // Forzamos ";" para evitar que las comas en los nombres de clientes desplacen las columnas
+            let parseado = Papa.parse(limpio, {
                 header: true,
-                delimiter: separadorReal,
+                delimiter: ";",
                 skipEmptyLines: true
             });
 
-            // Normalización absoluta de los nombres de columnas para que siempre crucen
+            // Fallback por si realmente era un CSV separado por comas
+            if (parseado.meta.fields && parseado.meta.fields.length <= 1) {
+                parseado = Papa.parse(limpio, { header: true, delimiter: ",", skipEmptyLines: true });
+            }
+
+            // Sanitización de llaves a formato estricto (ej. "CANT. CAJA DEV." -> "CANTCAJADEV")
             return parseado.data.map(fila => {
                 let filaLimpia = {};
                 for (let clave in fila) {
-                    if (fila.hasOwnProperty(clave)) {
-                        let claveNormalizada = clave.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "");
-                        filaLimpia[claveNormalizada] = fila[clave];
-                    }
+                    let claveNormalizada = clave.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "");
+                    filaLimpia[claveNormalizada] = fila[clave];
                 }
                 return filaLimpia;
             });
-        }
-
-        // Limpieza profunda de números (evita que un "1.500,25" rompa las matemáticas)
-        function limpiarNumero(val) {
-            if (!val) return 0;
-            let str = val.toString().trim();
-            if (str.includes('.') && str.includes(',')) str = str.replace(/\./g, '').replace(',', '.');
-            else if (str.includes(',')) str = str.replace(',', '.');
-            let n = parseFloat(str.replace(/[^0-9.-]/g, ''));
-            return isNaN(n) ? 0 : n;
-        }
-
-        function coincideMes(valorMesFila, nombreMesSelector) {
-            if (!valorMesFila) return false;
-            let v = valorMesFila.toString().toUpperCase().trim();
-            let numMes = mesesMap[nombreMesSelector];
-            return v === nombreMesSelector || v === numMes.toString() || v === ("0" + numMes);
         }
 
         async function inicializar() {
@@ -148,14 +132,30 @@
                     fetch(URL_DEV).then(res => res.text())
                 ]);
 
-                BD_DESPACHOS = parsearCSVBlindado(rDes);
-                BD_DEVOLUCIONES = parsearCSVBlindado(rDev);
+                BD_DESPACHOS = parsearDataBlindada(rDes);
+                BD_DEVOLUCIONES = parsearDataBlindada(rDev);
 
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
-                document.getElementById('status').innerText = "Error crítico: No se pudo conectar a GitHub.";
+                document.getElementById('status').innerText = "Error: Verifica la conexión a GitHub.";
             }
+        }
+
+        // Utilidades de limpieza y filtro
+        function parsearNumero(val) {
+            if (!val) return 0;
+            let str = val.toString().trim();
+            if (str.includes(',') && !str.includes('.')) str = str.replace(',', '.');
+            let n = parseFloat(str.replace(/[^0-9.-]/g, ''));
+            return isNaN(n) ? 0 : n;
+        }
+
+        function esMesCorrecto(valMes, mesSelector) {
+            if (!valMes) return false;
+            let v = valMes.toString().toUpperCase().trim();
+            let num = mesesNum[mesSelector];
+            return v === mesSelector || v === num.toString() || v === ("0" + num);
         }
 
         function actualizarDashboard() {
@@ -166,13 +166,13 @@
             document.getElementById('lbl-cajas-B').innerText = `Cajas ${mesB}`;
 
             // Filtrado Maestro
-            const devMesA = BD_DEVOLUCIONES.filter(r => coincideMes(r.MES, mesA));
-            const devMesB = BD_DEVOLUCIONES.filter(r => coincideMes(r.MES, mesB));
+            const devMesA = BD_DEVOLUCIONES.filter(r => esMesCorrecto(r.MES, mesA));
+            const devMesB = BD_DEVOLUCIONES.filter(r => esMesCorrecto(r.MES, mesB));
             const devAmbos = [...devMesA, ...devMesB];
 
-            // 0. INDICADORES SUPERIORES
-            const cajasA = devMesA.reduce((sum, r) => sum + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA || r.CAJASDEVUELTAS), 0);
-            const cajasB = devMesB.reduce((sum, r) => sum + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA || r.CAJASDEVUELTAS), 0);
+            // 0. KPIs SUPERIORES
+            const cajasA = devMesA.reduce((s, r) => s + parsearNumero(r.CANTCAJADEV || r.CANTCAJA || r.CAJASDEVUELTAS), 0);
+            const cajasB = devMesB.reduce((s, r) => s + parsearNumero(r.CANTCAJADEV || r.CANTCAJA || r.CAJASDEVUELTAS), 0);
 
             document.getElementById('val-cajas-A').innerText = Math.round(cajasA).toLocaleString('es-ES');
             document.getElementById('val-cajas-B').innerText = Math.round(cajasB).toLocaleString('es-ES');
@@ -191,10 +191,10 @@
             const fontConfig = { size: 9, color: '#2c3e50' };
             const layoutBase = { automargin: true, margin: { l: 50, r: 25, t: 50, b: 70 }, xaxis: { tickfont: fontConfig }, yaxis: { tickfont: fontConfig } };
 
-            // 1. MOTIVOS DE DEVOLUCIÓN
+            // 1. MOTIVOS (Limpio y directo)
             let motA = {}, motB = {};
-            devMesA.forEach(r => { let m = (r.MOTIVO || r.MOTIVODEVOLUCION || 'OTROS').toUpperCase().trim(); if(m && !m.includes("EDO")) motA[m] = (motA[m]||0) + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
-            devMesB.forEach(r => { let m = (r.MOTIVO || r.MOTIVODEVOLUCION || 'OTROS').toUpperCase().trim(); if(m && !m.includes("EDO")) motB[m] = (motB[m]||0) + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devMesA.forEach(r => { let m = (r.MOTIVO || 'OTROS').toUpperCase().trim(); if(m && isNaN(m) && !m.includes("EDO")) motA[m] = (motA[m]||0) + parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devMesB.forEach(r => { let m = (r.MOTIVO || 'OTROS').toUpperCase().trim(); if(m && isNaN(m) && !m.includes("EDO")) motB[m] = (motB[m]||0) + parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0,6);
 
             Plotly.newPlot('chart-motivos', [
@@ -202,9 +202,9 @@
                 { x: topMotivos, y: topMotivos.map(m => motB[m]||0), name: mesB, type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'auto', marker: {color: '#aec7e8'} }
             ], Object.assign({}, layoutBase, { barmode: 'group', title: 'TOP 6: MOTIVO DE DEVOLUCIONES' }));
 
-            // 2. PRODUCTOS (Buscando la descripción, no el código)
+            // 2. PRODUCTOS
             let prodMap = {};
-            devAmbos.forEach(r => { let p = (r.PRODUCTO || r.DESCRIPCION || 'S/D').toUpperCase().trim(); if(p && isNaN(p.substring(0,4))) prodMap[p] = (prodMap[p]||0) + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devAmbos.forEach(r => { let p = (r.PRODUCTO || r.DESCRIPCION || 'S/D').toUpperCase().trim(); if(p && isNaN(p.substring(0,4))) prodMap[p] = (prodMap[p]||0) + parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
             let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, 5).reverse();
             Plotly.newPlot('chart-productos', [{ 
                 y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', text: topProds.map(p => Math.round(prodMap[p])), textposition: 'auto', marker: {color: '#3182bd'} 
@@ -212,58 +212,60 @@
 
             // 3. ESTADOS
             let edoMap = {};
-            devAmbos.forEach(r => { let e = (r.ESTADO || r.EDO || '').toUpperCase().trim(); if(e && e.includes("EDO")) edoMap[e] = (edoMap[e]||0) + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devAmbos.forEach(r => { let e = (r.ESTADO || r.EDO || '').toUpperCase().trim(); if(e && e.includes("EDO")) edoMap[e] = (edoMap[e]||0) + parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
             let edosLabels = Object.keys(edoMap).sort((a,b) => edoMap[b] - edoMap[a]).slice(0,6);
             Plotly.newPlot('chart-estados', [{ labels: edosLabels, values: edosLabels.map(e => edoMap[e]), type: 'pie', textinfo: 'percent+label', textfont: { size: 9 }, hole: 0.4 }], { title: '% DEVOLUCIONES POR ESTADO', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
 
             // 4. RESPONSABLES
             let respMap = {};
-            devAmbos.forEach(r => { let re = (r.RESPONSABLE || 'S/D').toUpperCase().trim(); if(re && !re.includes("EDO")) respMap[re] = (respMap[re]||0) + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devAmbos.forEach(r => { let re = (r.RESPONSABLE || 'S/D').toUpperCase().trim(); if(re && !re.includes("EDO") && isNaN(re)) respMap[re] = (respMap[re]||0) + parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
             let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
             Plotly.newPlot('chart-responsables', [{ labels: topResp, values: topResp.map(re => respMap[re]), type: 'pie', textinfo: 'label+percent', textfont: { size: 9 }, hole: 0.4 }], { title: 'TOP 6: DEVOLUCIONES POR RESPONSABLE', showlegend: false, margin: { l: 20, r: 20, t: 50, b: 50 } });
 
-            // 5. CONCATENACIÓN MAESTRA: EFECTIVIDAD DE GUÍAS DE TRASLADO VS NOTAS DEVUELTAS
-            const despA = BD_DESPACHOS.find(r => coincideMes(r.MES, mesA));
-            const despB = BD_DESPACHOS.find(r => coincideMes(r.MES, mesB));
+            // ==============================================================================
+            // 5 & 6. CONCATENACIÓN OPERATIVA: TRASLADOS (RUTAS) VS DEVOLUCIONES
+            // ==============================================================================
+            const despA = BD_DESPACHOS.find(r => esMesCorrecto(r.MES, mesA)) || {};
+            const despB = BD_DESPACHOS.find(r => esMesCorrecto(r.MES, mesB)) || {};
             
-            const facturasRutaA = limpiarNumero(despA ? (despA.FACTURASDESPACHADAS || despA.TOTALFACTURAS) : 0);
-            const facturasRutaB = limpiarNumero(despB ? (despB.FACTURASDESPACHADAS || despB.TOTALFACTURAS) : 0);
+            // Extracción de Guías/Facturas y Cajas desde el archivo de Traslados (Despachos)
+            const factEnviadasA = parsearNumero(despA.FACTURASDESPACHADAS || despA.TOTALFACTURAS);
+            const factEnviadasB = parsearNumero(despB.FACTURASDESPACHADAS || despB.TOTALFACTURAS);
+            const cajasEnviadasA = parsearNumero(despA.CAJASDESPACHADAS || despA.TOTALCAJAS);
+            const cajasEnviadasB = parsearNumero(despB.CAJASDESPACHADAS || despB.TOTALCAJAS);
             
-            // Conteo de facturas únicas devueltas
-            const facturasDevA = [...new Set(devMesA.map(r => r.FACTURANOTA || r.FACTURA || r.NCONTROL))].filter(Boolean).length;
-            const facturasDevB = [...new Set(devMesB.map(r => r.FACTURANOTA || r.FACTURA || r.NCONTROL))].filter(Boolean).length;
+            // Extracción de Facturas/Notas únicas de la base de devoluciones
+            const factDevA = [...new Set(devMesA.map(r => r.FACTURANOTA || r.FACTURA || r.NCONTROL))].filter(Boolean).length;
+            const factDevB = [...new Set(devMesB.map(r => r.FACTURANOTA || r.FACTURA || r.NCONTROL))].filter(Boolean).length;
 
-            Plotly.newPlot('chart-concatenacion', [
-                { x: [mesA, mesB], y: [facturasRutaA, facturasRutaB], name: 'Guías/Facturas Emitidas', type: 'bar', text: [facturasRutaA, facturasRutaB], textposition: 'auto', marker: {color: '#95a5a6'} },
-                { x: [mesA, mesB], y: [facturasDevA, facturasDevB], name: 'Notas Devueltas (Rechazos)', type: 'bar', text: [facturasDevA, facturasDevB], textposition: 'auto', marker: {color: '#e74c3c'} }
-            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'CONCATENACIÓN: GUÍAS DE TRASLADO VS NOTAS DEVUELTAS' }));
+            // Gráfico Concatenación 1: FACTURAS/NOTAS
+            Plotly.newPlot('chart-concat-facturas', [
+                { x: [mesA, mesB], y: [factEnviadasA, factEnviadasB], name: 'Guías/Facturas Emitidas', type: 'bar', text: [factEnviadasA, factEnviadasB], textposition: 'auto', marker: {color: '#95a5a6'} },
+                { x: [mesA, mesB], y: [factDevA, factDevB], name: 'Notas Devueltas', type: 'bar', text: [factDevA, factDevB], textposition: 'auto', marker: {color: '#e74c3c'} }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'CONCATENACIÓN: GUÍAS EMITIDAS VS NOTAS DEVUELTAS' }));
 
-            // 6. CAJAS: VENTA NORMAL VS FIN DE MES
+            // Gráfico Concatenación 2: CAJAS
+            Plotly.newPlot('chart-concat-cajas', [
+                { x: [mesA, mesB], y: [cajasEnviadasA, cajasEnviadasB], name: 'Cajas en Traslado', type: 'bar', text: [cajasEnviadasA, cajasEnviadasB], textposition: 'auto', marker: {color: '#34495e'} },
+                { x: [mesA, mesB], y: [cajasA, cajasB], name: 'Cajas Devueltas', type: 'bar', text: [Math.round(cajasA), Math.round(cajasB)], textposition: 'auto', marker: {color: '#e67e22'} }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: 'CONCATENACIÓN: CAJAS DESPACHADAS VS DEVUELTAS' }));
+
+            // 7. VENTA NORMAL VS FIN DE MES (Cierre)
             let normA = 0, cierreA = 0, normB = 0, cierreB = 0;
-            devMesA.forEach(r => { let c = (r.COMENTARIOS || r.TIPODECIERRE || '').toUpperCase(); if(c.includes('FIN DE MES')) cierreA += limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); else normA += limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
-            devMesB.forEach(r => { let c = (r.COMENTARIOS || r.TIPODECIERRE || '').toUpperCase(); if(c.includes('FIN DE MES')) cierreB += limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); else normB += limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devMesA.forEach(r => { let c = (r.COMENTARIOS || r.TIPODECIERRE || '').toUpperCase(); if(c.includes('FIN DE MES')) cierreA += parsearNumero(r.CANTCAJADEV || r.CANTCAJA); else normA += parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devMesB.forEach(r => { let c = (r.COMENTARIOS || r.TIPODECIERRE || '').toUpperCase(); if(c.includes('FIN DE MES')) cierreB += parsearNumero(r.CANTCAJADEV || r.CANTCAJA); else normB += parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
 
             Plotly.newPlot('chart-cierre-mes', [
                 { x: [mesA, mesB], y: [normA, normB], name: 'Venta Normal', type: 'bar', text: [Math.round(normA), Math.round(normB)], textposition: 'auto', marker: {color: '#003366'} },
-                { x: [mesA, mesB], y: [cierreA, cierreB], name: 'Fin de Mes', type: 'bar', text: [Math.round(cierreA), Math.round(cierreB)], textposition: 'auto', marker: {color: '#e67e22'} }
-            ], Object.assign({}, layoutBase, { barmode: 'stack', title: 'CAJAS DEVUELTAS: NORMAL VS FIN DE MES' }));
+                { x: [mesA, mesB], y: [cierreA, cierreB], name: 'Fin de Mes', type: 'bar', text: [Math.round(cierreA), Math.round(cierreB)], textposition: 'auto', marker: {color: '#27ae60'} }
+            ], Object.assign({}, layoutBase, { barmode: 'stack', title: 'CAJAS: VENTA NORMAL VS FIN DE MES' }));
 
-            // 7. PARTICIPACIÓN ANUAL GENERAL
-            const totalAnual = BD_DEVOLUCIONES.reduce((s, r) => s + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA), 0) || 1;
-            let repAnual = mesesLista.map(m => {
-                let sub = BD_DEVOLUCIONES.filter(r => coincideMes(r.MES, m));
-                return (sub.reduce((s, r) => s + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA), 0) / totalAnual) * 100;
-            });
-            Plotly.newPlot('chart-participacion-anual', [{ 
-                x: mesesLista, y: repAnual, type: 'bar', text: repAnual.map(v => v.toFixed(0) + '%'), textposition: 'auto', marker: {color: '#34495e'} 
-            }], Object.assign({}, layoutBase, { title: '% PARTICIPACIÓN DE CAJAS SOBRE TOTAL ANUAL' }));
-
-            // 8. TOP DEVOLUCIONES POR TRANSPORTE / TRASLADO
+            // 8. TRANSPORTE / FLOTA
             let transMap = {};
-            devAmbos.forEach(r => { let t = (r.TRANSPORTE || r.CHOFER || 'S/D').toUpperCase().trim(); if(t && !t.includes("EDO")) transMap[t] = (transMap[t]||0) + limpiarNumero(r.CANTCAJADEV || r.CANTCAJA); });
+            devAmbos.forEach(r => { let t = (r.TRANSPORTE || r.CHOFER || 'S/D').toUpperCase().trim(); if(t && !t.includes("EDO") && isNaN(t)) transMap[t] = (transMap[t]||0) + parsearNumero(r.CANTCAJADEV || r.CANTCAJA); });
             let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, 6);
             Plotly.newPlot('chart-flota', [{ 
-                x: topTrans, y: topTrans.map(t => transMap[t]), type: 'bar', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'auto', marker: {color: '#e67e22'} 
+                x: topTrans, y: topTrans.map(t => transMap[t]), type: 'bar', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'auto', marker: {color: '#8e44ad'} 
             }], Object.assign({}, layoutBase, { title: 'TOP 6: CAJAS DEVUELTAS POR TRANSPORTE' }));
 
             document.getElementById('status').innerText = "Dashboard Analítico Sincronizado: " + new Date().toLocaleTimeString();
