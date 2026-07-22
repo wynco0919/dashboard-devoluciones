@@ -28,7 +28,7 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones y Traslados</h1>
-        <div id="status">Calculando Faltantes (Displays vs Paq/Und)...</div>
+        <div id="status">Justificando gráficas dinámicamente...</div>
     </div>
 
     <div class="selector-box">
@@ -155,8 +155,8 @@
                         year: year,
                         producto: (r[10] || 'S/D').trim().toUpperCase(),
                         cajas: parsearNumero(r[13]),                    
-                        disp: parsearNumero(r[14]),  // Extrae Displays
-                        und: parsearNumero(r[15]),   // Extrae Paquetes/Unidades                
+                        disp: parsearNumero(r[14]),  
+                        und: parsearNumero(r[15]),                 
                         chofer: (r[19] || 'S/D').trim().toUpperCase(),  
                         transporte: (r[20] || 'S/D').trim().toUpperCase(),
                         motivo: (r[21] || 'OTROS').trim().toUpperCase(), 
@@ -211,7 +211,6 @@
             const devB = BD_DEVOLUCIONES.filter(r => esMesDevolucion(r, mesB));
             const devAmbos = [...devA, ...devB];
 
-            // 0. KPIs SUPERIORES
             const cajasA = devA.reduce((s, r) => s + r.cajas, 0);
             const cajasB = devB.reduce((s, r) => s + r.cajas, 0);
 
@@ -235,9 +234,9 @@
             
             const layoutBase = { automargin: true, margin: { l: 30, r: 35, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: fontConfig, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.2} };
             
-            // Layouts con l: 280 para acomodar los nombres largos completos
-            const layoutHNoLegend = { automargin: true, margin: { l: 280, r: 40, t: 40, b: 30 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: false };
-            const layoutHLegend = { automargin: true, margin: { l: 280, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
+            // LA CORRECCIÓN UI/UX: Reducimos el margen 'l' pero forzamos 'automargin' verdadero en el eje Y para que se justifique perfecto.
+            const layoutHNoLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 30 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: false };
+            const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
             // 1. MOTIVO DE LAS DEVOLUCIONES
@@ -253,7 +252,7 @@
             ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}} }));
 
             // =======================================================
-            // 2. PRODUCTOS DEVUELTOS (Espacio Ampliado para Textos)
+            // 2. PRODUCTOS DEVUELTOS (Auto-justificado)
             // =======================================================
             let prodMap = {};
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
@@ -263,7 +262,7 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'CAJAS DEVUELTAS X PRODUCTO', font: {size: 11}} }));
 
             // =======================================================
-            // 3. % DEVOLUCIONES POR ESTADO (Registro Único / Factura)
+            // 3. % DEVOLUCIONES POR ESTADO
             // =======================================================
             let edoFacturasMap = {};
             devAmbos.forEach(r => { 
@@ -294,7 +293,7 @@
             ], Object.assign({}, layoutBase, { title: {text: 'TOP 6: RESPONSABLES', font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
             // =======================================================
-            // 5. TRANSPORTE (Espacio Ampliado)
+            // 5. TRANSPORTE (Auto-justificado)
             // =======================================================
             let transMap = {};
             devAmbos.forEach(r => { if(!r.transporte.includes("EDO") && isNaN(r.transporte) && r.transporte !== 'S/D') transMap[r.transporte] = (transMap[r.transporte]||0) + r.cajas; });
@@ -304,7 +303,7 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: TRANSPORTE', font: {size: 11}} }));
 
             // =======================================================
-            // 6. CHOFER (Espacio Ampliado)
+            // 6. CHOFER (Auto-justificado)
             // =======================================================
             let choferMap = {};
             devAmbos.forEach(r => { if(!r.chofer.includes("EDO") && isNaN(r.chofer) && r.chofer !== 'S/D') choferMap[r.chofer] = (choferMap[r.chofer]||0) + r.cajas; });
@@ -314,23 +313,22 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: CHOFER', font: {size: 11}} }));
 
             // =======================================================
-            // 7. FALTANTES (DISPLAYS Vs PAQ/UND) - Igual a la imagen de Excel
+            // 7. FALTANTES (DISPLAYS Vs PAQ/UND) (Auto-justificado)
             // =======================================================
             let faltMap = {};
             devAmbos.forEach(r => { 
                 if(r.motivo === 'FALTANTE' && r.producto !== 'S/D') {
                     if(!faltMap[r.producto]) faltMap[r.producto] = {disp: 0, und: 0};
                     faltMap[r.producto].disp += r.disp;
-                    faltMap[r.producto].und += r.und; // Unidades y Paquetes
+                    faltMap[r.producto].und += r.und;
                 }
             });
-            // Ordenamos por la suma total para tener los verdaderos Top Faltantes
             let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0,6).reverse();
 
             Plotly.newPlot('chart-faltantes', [
-                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', marker: {color: cOrange} },
-                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', marker: {color: cBlue} }
-            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: DEVOLUCIÓN POR FALTANTE (DISP/UND)', font: {size: 11}} }));
+                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'auto', marker: {color: cOrange} },
+                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'auto', marker: {color: cBlue} }
+            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: FALTANTES (DISP/UND)', font: {size: 11}} }));
 
             // =======================================================
             // 8. FACTURAS DESPACHADAS Vs DEVUELTAS
