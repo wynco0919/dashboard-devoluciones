@@ -28,7 +28,7 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones y Traslados</h1>
-        <div id="status">Calculando Ventana Móvil de 12 Meses...</div>
+        <div id="status">Concatenando y Ajustando Gráficas...</div>
     </div>
 
     <div class="selector-box">
@@ -89,7 +89,6 @@
         </div>
     </div>
 
-    <!-- Malla Analítica de Gráficos -->
     <div class="charts-row-3">
         <div class="chart-box"><div id="chart-motivos" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-productos" class="plotly-graph-div"></div></div>
@@ -116,6 +115,7 @@
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
         
+        const mesesNumStr = { "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04", "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08", "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12" };
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
         function parsearNumero(val) {
@@ -133,17 +133,34 @@
             return parsed.data.slice(1);
         }
 
+        // Algoritmo de Salto de Línea para Nombres Largos
+        function wrapText(text, maxChars) {
+            if (text.length <= maxChars) return text;
+            let words = text.split(' ');
+            let line = '';
+            let result = '';
+            for(let w of words) {
+                if((line + w).length > maxChars) {
+                    result += line.trim() + '<br>';
+                    line = w + ' ';
+                } else {
+                    line += w + ' ';
+                }
+            }
+            result += line.trim();
+            return result;
+        }
+
         async function inicializar() {
             try {
                 const [rDes, rDev] = await Promise.all([ fetch(URL_DES).then(r => r.text()), fetch(URL_DEV).then(r => r.text()) ]);
                 
-                let maxYearByMonth = {}; // Diccionario inteligente para guardar el año más reciente de CADA mes individualmente
+                let maxYearByMonth = {}; 
 
-                // PASO 1: MAPEAR Y REGISTRAR AÑOS DE DEVOLUCIONES
                 let dataDev = parsearDataPorCoordenadas(rDev).map(r => {
                     if (r.length < 25) return null;
                     let fechaF = (r[6] || '').trim();
-                    let year = 2026; // Año Base
+                    let year = 2026; 
                     let mesReal = "";
 
                     if(fechaF.includes('/')) {
@@ -151,17 +168,13 @@
                         if (partes.length >= 3) {
                             let mNum = parseInt(partes[1], 10);
                             year = parseInt(partes[2].substring(0, 4), 10);
-                            if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) {
-                                mesReal = mesesLista[mNum - 1];
-                            }
+                            if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) mesReal = mesesLista[mNum - 1];
                         }
                     } else {
-                        // Fallback a columna Mes si no hay fecha factura
                         let mNum = parseInt((r[3] || '').trim(), 10);
                         if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) mesReal = mesesLista[mNum - 1];
                     }
 
-                    // Registrar el año más alto de cada mes
                     if (mesReal) {
                         if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) {
                             maxYearByMonth[mesReal] = year;
@@ -170,7 +183,7 @@
 
                     return {
                         factura: (r[0] || '').trim().toUpperCase(),
-                        mesReal: mesReal, // Reemplaza la lógica anterior, ya estandarizado a "ENERO", "FEBRERO", etc.
+                        mesReal: mesReal, 
                         year: year,
                         producto: (r[10] || 'S/D').trim().toUpperCase(),
                         cajas: parsearNumero(r[13]),                    
@@ -185,7 +198,6 @@
                     };
                 }).filter(Boolean);
 
-                // PASO 2: MAPEAR Y REGISTRAR AÑOS DE DESPACHOS
                 let dataDes = parsearDataPorCoordenadas(rDes).map(r => {
                     if (r.length < 3) return null;
                     let mesReal = (r[0] || '').trim().toUpperCase();
@@ -204,10 +216,12 @@
                     };
                 }).filter(Boolean);
 
-                // PASO 3: FILTRAR CON VENTANA MÓVIL
-                // Solo se quedan las filas cuyo año coincida con el AÑO MÁS ALTO de su mes específico
+                // Aplica Ventana Móvil
                 BD_DEVOLUCIONES = dataDev.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
                 BD_DESPACHOS = dataDes.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
+
+                let maxGlobalYear = Math.max(...Object.values(maxYearByMonth));
+                document.getElementById('lbl-anio').innerText = `Año Activo: ${maxGlobalYear} (Ventana Móvil 12 Meses)`;
 
                 actualizarDashboard();
             } catch (e) {
@@ -223,7 +237,6 @@
             document.getElementById('lbl-cajas-A').innerText = mesA;
             document.getElementById('lbl-cajas-B').innerText = mesB;
 
-            // Filtro extremadamente directo: Solo busca "ENERO", "FEBRERO", etc. que ya está limpio en mesReal
             const devA = BD_DEVOLUCIONES.filter(r => r.mesReal === mesA);
             const devB = BD_DEVOLUCIONES.filter(r => r.mesReal === mesB);
             const devAmbos = [...devA, ...devB];
@@ -255,23 +268,19 @@
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
-            // 1. MOTIVO DE LAS DEVOLUCIONES
+            // 1. MOTIVOS (Con Textos Separados por Líneas para que se lean bien)
             // =======================================================
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
             devB.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motB[r.motivo] = (motB[r.motivo]||0) + r.cajas; });
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0,6);
 
-            const layoutMotivos = Object.assign({}, layoutBase, { 
-                barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}}, 
-                xaxis: { tickfont: {size: 8.5}, cliponaxis: false, tickangle: -45 },
-                margin: { l: 30, r: 35, t: 40, b: 100 }
-            });
+            let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12)); // Algoritmo que salta la línea
 
             Plotly.newPlot('chart-motivos', [
-                { x: topMotivos, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
-                { x: topMotivos, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} }
-            ], layoutMotivos);
+                { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
+                { x: topMotivosWrapped, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} }
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
 
             // =======================================================
             // 2. PRODUCTOS DEVUELTOS
@@ -284,25 +293,30 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'CAJAS DEVUELTAS X PRODUCTO', font: {size: 11}} }));
 
             // =======================================================
-            // 3. % DEVOLUCIONES POR ESTADO
+            // 3. % DEVOLUCIONES POR ESTADO (Calculado sobre el Gran Total Real del País)
             // =======================================================
             let edoFacturasMap = {};
             let totalFacturasUnicas = new Set();
+            
             devAmbos.forEach(r => { 
                 if(r.factura && r.factura !== 'S/D') totalFacturasUnicas.add(r.factura);
-                if(r.estado.includes("EDO")) {
+                // Ahora acepta todos los estados, no solo los que digan 'EDO'
+                if(r.estado && r.estado !== 'S/D') {
                     if(!edoFacturasMap[r.estado]) edoFacturasMap[r.estado] = new Set();
                     if(r.factura && r.factura !== 'S/D') edoFacturasMap[r.estado].add(r.factura);
                 }
             });
+            
             let granTotalFacturas = totalFacturasUnicas.size || 1;
             let edosLabels = Object.keys(edoFacturasMap).sort((a,b) => edoFacturasMap[b].size - edoFacturasMap[a].size).slice(0,6);
             let edosValues = edosLabels.map(e => edoFacturasMap[e].size);
-            let edosText = edosValues.map(v => `${v} (${(v / granTotalFacturas * 100).toFixed(2)}%)`);
+            
+            // Fórmula idéntica a Excel para mostrar % + Label + Cantidad
+            let edosText = edosLabels.map((e, i) => `${(edosValues[i] / granTotalFacturas * 100).toFixed(2)}%<br>${e}: ${edosValues[i]}`);
 
             Plotly.newPlot('chart-estados', [{ 
-                labels: edosLabels, values: edosValues, type: 'pie', text: edosText, textinfo: 'label+text', textposition: 'outside', textfont: { size: 9 }, hole: 0.3 
-            }], { title: {text: '% DEVOLUCIONES X ESTADO (FACTURAS)', font: {size: 11}}, showlegend: false, margin: { l: 30, r: 30, t: 40, b: 30 } });
+                labels: edosLabels, values: edosValues, type: 'pie', text: edosText, textinfo: 'text', textposition: 'outside', textfont: { size: 9 }, hole: 0.3 
+            }], { title: {text: '% DEVOLUCIONES X ESTADO (FACTURAS)', font: {size: 11}}, showlegend: false, margin: { l: 40, r: 40, t: 40, b: 30 } });
 
             // =======================================================
             // 4. RESPONSABLES
@@ -314,8 +328,8 @@
 
             let respText = topResp.map(re => Math.round(respMap[re]) + ' (' + Math.round((respMap[re]/totalRespCajas)*100) + '%)');
             Plotly.newPlot('chart-responsables', [
-                { x: topResp, y: topResp.map(re => respMap[re]), type: 'bar', text: respText, textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
-                { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
+                { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: respText, textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
+                { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% RESPONSABLE', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
             ], Object.assign({}, layoutBase, { title: {text: 'TOP 6: RESPONSABLES', font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
             // =======================================================
@@ -354,7 +368,7 @@
             Plotly.newPlot('chart-faltantes', [
                 { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', marker: {color: cOrange} },
                 { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', marker: {color: cBlue} }
-            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: DEVOLUCIÓN POR FALTANTE (DISP/UND)', font: {size: 11}} }));
+            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: FALTANTES (DISP/UND)', font: {size: 11}} }));
 
             // =======================================================
             // 8. FACTURAS DESPACHADAS Vs DEVUELTAS
@@ -402,7 +416,7 @@
                 { x: mesesActuales, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
-            document.getElementById('status').innerText = `Dashboard Sincronizado. (Ventana Activa: Últimos 12 Meses)`;
+            document.getElementById('status').innerText = `Dashboard Analítico Activo y Sincronizado.`;
         }
 
         window.onload = inicializar;
