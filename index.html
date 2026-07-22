@@ -28,12 +28,12 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones y Traslados</h1>
-        <div id="status">Justificando gráficas dinámicamente...</div>
+        <div id="status">Calculando Ventana Móvil de 12 Meses...</div>
     </div>
 
     <div class="selector-box">
-        <div id="lbl-anio" style="font-size: 1.2em; font-weight: bold; color: var(--primary); padding: 5px 15px; background: #dff9fb; border-radius: 5px; border: 1px solid #c7ecee;">
-            Año: --
+        <div id="lbl-anio" style="font-size: 1.1em; font-weight: bold; color: var(--primary); padding: 8px 15px; background: #dff9fb; border-radius: 5px; border: 1px solid #c7ecee;">
+            Periodo: Últimos 12 Meses Registrados
         </div>
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
@@ -115,9 +115,7 @@
 
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
-        let CURRENT_YEAR = new Date().getFullYear();
         
-        const mesesNumStr = { "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04", "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08", "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12" };
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
         function parsearNumero(val) {
@@ -139,19 +137,40 @@
             try {
                 const [rDes, rDev] = await Promise.all([ fetch(URL_DES).then(r => r.text()), fetch(URL_DEV).then(r => r.text()) ]);
                 
-                let maxYear = 0;
+                let maxYearByMonth = {}; // Diccionario inteligente para guardar el año más reciente de CADA mes individualmente
 
-                BD_DEVOLUCIONES = parsearDataPorCoordenadas(rDev).map(r => {
+                // PASO 1: MAPEAR Y REGISTRAR AÑOS DE DEVOLUCIONES
+                let dataDev = parsearDataPorCoordenadas(rDev).map(r => {
                     if (r.length < 25) return null;
                     let fechaF = (r[6] || '').trim();
-                    let year = 0;
+                    let year = 2026; // Año Base
+                    let mesReal = "";
+
                     if(fechaF.includes('/')) {
-                        year = parseInt(fechaF.split('/')[2], 10);
-                        if(year > maxYear) maxYear = year;
+                        let partes = fechaF.split('/');
+                        if (partes.length >= 3) {
+                            let mNum = parseInt(partes[1], 10);
+                            year = parseInt(partes[2].substring(0, 4), 10);
+                            if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) {
+                                mesReal = mesesLista[mNum - 1];
+                            }
+                        }
+                    } else {
+                        // Fallback a columna Mes si no hay fecha factura
+                        let mNum = parseInt((r[3] || '').trim(), 10);
+                        if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) mesReal = mesesLista[mNum - 1];
                     }
+
+                    // Registrar el año más alto de cada mes
+                    if (mesReal) {
+                        if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) {
+                            maxYearByMonth[mesReal] = year;
+                        }
+                    }
+
                     return {
                         factura: (r[0] || '').trim().toUpperCase(),
-                        fechaFact: fechaF,                 
+                        mesReal: mesReal, // Reemplaza la lógica anterior, ya estandarizado a "ENERO", "FEBRERO", etc.
                         year: year,
                         producto: (r[10] || 'S/D').trim().toUpperCase(),
                         cajas: parsearNumero(r[13]),                    
@@ -166,38 +185,35 @@
                     };
                 }).filter(Boolean);
 
-                BD_DESPACHOS = parsearDataPorCoordenadas(rDes).map(r => {
+                // PASO 2: MAPEAR Y REGISTRAR AÑOS DE DESPACHOS
+                let dataDes = parsearDataPorCoordenadas(rDes).map(r => {
                     if (r.length < 3) return null;
-                    let year = parseInt(r[1] || '0', 10);
-                    if(year > maxYear) maxYear = year;
+                    let mesReal = (r[0] || '').trim().toUpperCase();
+                    let year = parseInt((r[1] || '2026').trim(), 10);
+                    
+                    if (mesesLista.includes(mesReal)) {
+                        if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) {
+                            maxYearByMonth[mesReal] = year;
+                        }
+                    }
                     return {
-                        mes: (r[0] || '').trim().toUpperCase(),
+                        mesReal: mesReal,
                         year: year,
                         cajasDespachadas: parsearNumero(r[2]),
                         facturasDespachadas: parsearNumero(r[3])
                     };
                 }).filter(Boolean);
 
-                CURRENT_YEAR = maxYear || new Date().getFullYear();
-                document.getElementById('lbl-anio').innerText = `Año Activo: ${CURRENT_YEAR}`;
-                
-                BD_DEVOLUCIONES = BD_DEVOLUCIONES.filter(d => d.year === CURRENT_YEAR);
-                BD_DESPACHOS = BD_DESPACHOS.filter(d => d.year === CURRENT_YEAR);
+                // PASO 3: FILTRAR CON VENTANA MÓVIL
+                // Solo se quedan las filas cuyo año coincida con el AÑO MÁS ALTO de su mes específico
+                BD_DEVOLUCIONES = dataDev.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
+                BD_DESPACHOS = dataDes.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
 
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
                 document.getElementById('status').innerText = "Error: Verifica la conexión a GitHub.";
             }
-        }
-
-        function esMesDevolucion(fila, mesTexto) {
-            let numStr = mesesNumStr[mesTexto];
-            let fecha = (fila.fechaFact || '').replace(/-/g, '/');
-            if (fecha.includes('/')) {
-                return fecha.split('/')[1] === numStr;
-            }
-            return false;
         }
 
         function actualizarDashboard() {
@@ -207,10 +223,12 @@
             document.getElementById('lbl-cajas-A').innerText = mesA;
             document.getElementById('lbl-cajas-B').innerText = mesB;
 
-            const devA = BD_DEVOLUCIONES.filter(r => esMesDevolucion(r, mesA));
-            const devB = BD_DEVOLUCIONES.filter(r => esMesDevolucion(r, mesB));
+            // Filtro extremadamente directo: Solo busca "ENERO", "FEBRERO", etc. que ya está limpio en mesReal
+            const devA = BD_DEVOLUCIONES.filter(r => r.mesReal === mesA);
+            const devB = BD_DEVOLUCIONES.filter(r => r.mesReal === mesB);
             const devAmbos = [...devA, ...devB];
 
+            // 0. KPIs SUPERIORES
             const cajasA = devA.reduce((s, r) => s + r.cajas, 0);
             const cajasB = devB.reduce((s, r) => s + r.cajas, 0);
 
@@ -233,8 +251,6 @@
             const fontConfig = { size: 9.5, color: '#2c3e50' };
             
             const layoutBase = { automargin: true, margin: { l: 30, r: 35, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: fontConfig, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.2} };
-            
-            // LA CORRECCIÓN UI/UX: Reducimos el margen 'l' pero forzamos 'automargin' verdadero en el eje Y para que se justifique perfecto.
             const layoutHNoLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 30 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: false };
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
@@ -246,13 +262,19 @@
             devB.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motB[r.motivo] = (motB[r.motivo]||0) + r.cajas; });
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0,6);
 
+            const layoutMotivos = Object.assign({}, layoutBase, { 
+                barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}}, 
+                xaxis: { tickfont: {size: 8.5}, cliponaxis: false, tickangle: -45 },
+                margin: { l: 30, r: 35, t: 40, b: 100 }
+            });
+
             Plotly.newPlot('chart-motivos', [
                 { x: topMotivos, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
                 { x: topMotivos, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} }
-            ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}} }));
+            ], layoutMotivos);
 
             // =======================================================
-            // 2. PRODUCTOS DEVUELTOS (Auto-justificado)
+            // 2. PRODUCTOS DEVUELTOS
             // =======================================================
             let prodMap = {};
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
@@ -265,17 +287,21 @@
             // 3. % DEVOLUCIONES POR ESTADO
             // =======================================================
             let edoFacturasMap = {};
+            let totalFacturasUnicas = new Set();
             devAmbos.forEach(r => { 
+                if(r.factura && r.factura !== 'S/D') totalFacturasUnicas.add(r.factura);
                 if(r.estado.includes("EDO")) {
                     if(!edoFacturasMap[r.estado]) edoFacturasMap[r.estado] = new Set();
                     if(r.factura && r.factura !== 'S/D') edoFacturasMap[r.estado].add(r.factura);
                 }
             });
+            let granTotalFacturas = totalFacturasUnicas.size || 1;
             let edosLabels = Object.keys(edoFacturasMap).sort((a,b) => edoFacturasMap[b].size - edoFacturasMap[a].size).slice(0,6);
             let edosValues = edosLabels.map(e => edoFacturasMap[e].size);
-            
+            let edosText = edosValues.map(v => `${v} (${(v / granTotalFacturas * 100).toFixed(2)}%)`);
+
             Plotly.newPlot('chart-estados', [{ 
-                labels: edosLabels, values: edosValues, type: 'pie', textinfo: 'label+value+percent', textposition: 'outside', textfont: { size: 9 }, hole: 0.3 
+                labels: edosLabels, values: edosValues, type: 'pie', text: edosText, textinfo: 'label+text', textposition: 'outside', textfont: { size: 9 }, hole: 0.3 
             }], { title: {text: '% DEVOLUCIONES X ESTADO (FACTURAS)', font: {size: 11}}, showlegend: false, margin: { l: 30, r: 30, t: 40, b: 30 } });
 
             // =======================================================
@@ -293,7 +319,7 @@
             ], Object.assign({}, layoutBase, { title: {text: 'TOP 6: RESPONSABLES', font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
             // =======================================================
-            // 5. TRANSPORTE (Auto-justificado)
+            // 5. TRANSPORTE
             // =======================================================
             let transMap = {};
             devAmbos.forEach(r => { if(!r.transporte.includes("EDO") && isNaN(r.transporte) && r.transporte !== 'S/D') transMap[r.transporte] = (transMap[r.transporte]||0) + r.cajas; });
@@ -303,7 +329,7 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: TRANSPORTE', font: {size: 11}} }));
 
             // =======================================================
-            // 6. CHOFER (Auto-justificado)
+            // 6. CHOFER
             // =======================================================
             let choferMap = {};
             devAmbos.forEach(r => { if(!r.chofer.includes("EDO") && isNaN(r.chofer) && r.chofer !== 'S/D') choferMap[r.chofer] = (choferMap[r.chofer]||0) + r.cajas; });
@@ -313,7 +339,7 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: CHOFER', font: {size: 11}} }));
 
             // =======================================================
-            // 7. FALTANTES (DISPLAYS Vs PAQ/UND) (Auto-justificado)
+            // 7. FALTANTES (DISPLAYS Vs PAQ/UND)
             // =======================================================
             let faltMap = {};
             devAmbos.forEach(r => { 
@@ -326,18 +352,18 @@
             let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0,6).reverse();
 
             Plotly.newPlot('chart-faltantes', [
-                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'auto', marker: {color: cOrange} },
-                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'auto', marker: {color: cBlue} }
-            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: FALTANTES (DISP/UND)', font: {size: 11}} }));
+                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', marker: {color: cOrange} },
+                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', marker: {color: cBlue} }
+            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: DEVOLUCIÓN POR FALTANTE (DISP/UND)', font: {size: 11}} }));
 
             // =======================================================
             // 8. FACTURAS DESPACHADAS Vs DEVUELTAS
             // =======================================================
-            let mesesActuales = mesesLista.filter(m => BD_DESPACHOS.some(d => d.mes === m) || BD_DEVOLUCIONES.some(d => esMesDevolucion(d, m)));
+            let mesesActuales = mesesLista.filter(m => BD_DESPACHOS.some(d => d.mesReal === m) || BD_DEVOLUCIONES.some(d => d.mesReal === m));
             
-            let fDespArr = mesesActuales.map(m => { let d = BD_DESPACHOS.find(x => x.mes === m); return d ? d.facturasDespachadas : 0; });
+            let fDespArr = mesesActuales.map(m => { let d = BD_DESPACHOS.find(x => x.mesReal === m); return d ? d.facturasDespachadas : 0; });
             let fDevArr = mesesActuales.map(m => {
-                let devM = BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m));
+                let devM = BD_DEVOLUCIONES.filter(x => x.mesReal === m);
                 return new Set(devM.map(x => x.factura).filter(x => x && x !== 'S/D')).size;
             });
             let fDevPctArr = fDevArr.map((v, i) => fDespArr[i] > 0 ? (v / fDespArr[i]) : 0);
@@ -351,8 +377,8 @@
             // =======================================================
             // 9. CAJAS NORMAL Vs FIN DE MES
             // =======================================================
-            let cierreArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m) && x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
-            let normArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m) && !x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
+            let cierreArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
+            let normArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m && !x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
             let totalCierre = normArr.map((v, i) => v + cierreArr[i]);
 
             let textNorm = normArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round((v/totalCierre[i])*100) + '%)' : '');
@@ -367,7 +393,7 @@
             // 10. CAJAS TOTALES / PARTICIPACION
             // =======================================================
             let totalAnual = BD_DEVOLUCIONES.reduce((s,x)=>s+x.cajas,0) || 1;
-            let cajasMesArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => esMesDevolucion(x, m)).reduce((s,x)=>s+x.cajas,0));
+            let cajasMesArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m).reduce((s,x)=>s+x.cajas,0));
             let pctMesArr = cajasMesArr.map(v => v / totalAnual);
             let cajasText = cajasMesArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round(pctMesArr[i]*100) + '%)' : '');
 
@@ -376,7 +402,7 @@
                 { x: mesesActuales, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
-            document.getElementById('status').innerText = `Dashboard Analítico Operativo sincronizado para el año ${CURRENT_YEAR}.`;
+            document.getElementById('status').innerText = `Dashboard Sincronizado. (Ventana Activa: Últimos 12 Meses)`;
         }
 
         window.onload = inicializar;
