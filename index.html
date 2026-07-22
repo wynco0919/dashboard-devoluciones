@@ -28,7 +28,7 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones y Traslados</h1>
-        <div id="status">Concatenando y Ajustando Gráficas...</div>
+        <div id="status">Calculando Ventana Móvil de 12 Meses...</div>
     </div>
 
     <div class="selector-box">
@@ -38,8 +38,8 @@
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
             <select id="mesA" onchange="actualizarDashboard()">
-                <option value="JUNIO">JUNIO</option>
                 <option value="MAYO">MAYO</option>
+                <option value="JUNIO">JUNIO</option>
                 <option value="ENERO">ENERO</option>
                 <option value="FEBRERO">FEBRERO</option>
                 <option value="MARZO">MARZO</option>
@@ -55,13 +55,13 @@
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
             <select id="mesB" onchange="actualizarDashboard()">
-                <option value="JULIO">JULIO</option>
                 <option value="JUNIO">JUNIO</option>
                 <option value="MAYO">MAYO</option>
                 <option value="ENERO">ENERO</option>
                 <option value="FEBRERO">FEBRERO</option>
                 <option value="MARZO">MARZO</option>
                 <option value="ABRIL">ABRIL</option>
+                <option value="JULIO">JULIO</option>
                 <option value="AGOSTO">AGOSTO</option>
                 <option value="SEPTIEMBRE">SEPTIEMBRE</option>
                 <option value="OCTUBRE">OCTUBRE</option>
@@ -89,6 +89,7 @@
         </div>
     </div>
 
+    <!-- Malla Analítica de Gráficos -->
     <div class="charts-row-3">
         <div class="chart-box"><div id="chart-motivos" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-productos" class="plotly-graph-div"></div></div>
@@ -115,7 +116,6 @@
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
         
-        const mesesNumStr = { "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04", "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08", "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12" };
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
         function parsearNumero(val) {
@@ -133,7 +133,6 @@
             return parsed.data.slice(1);
         }
 
-        // Algoritmo de Salto de Línea para Nombres Largos
         function wrapText(text, maxChars) {
             if (text.length <= maxChars) return text;
             let words = text.split(' ');
@@ -168,7 +167,9 @@
                         if (partes.length >= 3) {
                             let mNum = parseInt(partes[1], 10);
                             year = parseInt(partes[2].substring(0, 4), 10);
-                            if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) mesReal = mesesLista[mNum - 1];
+                            if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) {
+                                mesReal = mesesLista[mNum - 1];
+                            }
                         }
                     } else {
                         let mNum = parseInt((r[3] || '').trim(), 10);
@@ -216,7 +217,7 @@
                     };
                 }).filter(Boolean);
 
-                // Aplica Ventana Móvil
+                // FILTRO INTELIGENTE: Mantiene ventana móvil interactiva de 12 meses
                 BD_DEVOLUCIONES = dataDev.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
                 BD_DESPACHOS = dataDes.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
 
@@ -264,18 +265,20 @@
             const fontConfig = { size: 9.5, color: '#2c3e50' };
             
             const layoutBase = { automargin: true, margin: { l: 30, r: 35, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: fontConfig, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.2} };
+            
+            // Auto-Justificación habilitada para Gráficas Horizontales
             const layoutHNoLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 30 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: false };
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
-            // 1. MOTIVOS (Con Textos Separados por Líneas para que se lean bien)
+            // 1. MOTIVOS DE DEVOLUCIÓN (Textos Inclinados y Limpios)
             // =======================================================
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
             devB.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motB[r.motivo] = (motB[r.motivo]||0) + r.cajas; });
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0,6);
 
-            let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12)); // Algoritmo que salta la línea
+            let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12));
 
             Plotly.newPlot('chart-motivos', [
                 { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
@@ -283,7 +286,7 @@
             ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
 
             // =======================================================
-            // 2. PRODUCTOS DEVUELTOS
+            // 2. PRODUCTOS DEVUELTOS (Nombres Completos Auto-Ajustados)
             // =======================================================
             let prodMap = {};
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
@@ -293,14 +296,13 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'CAJAS DEVUELTAS X PRODUCTO', font: {size: 11}} }));
 
             // =======================================================
-            // 3. % DEVOLUCIONES POR ESTADO (Calculado sobre el Gran Total Real del País)
+            // 3. % DEVOLUCIONES POR ESTADO (Exacto a Excel)
             // =======================================================
             let edoFacturasMap = {};
             let totalFacturasUnicas = new Set();
             
             devAmbos.forEach(r => { 
                 if(r.factura && r.factura !== 'S/D') totalFacturasUnicas.add(r.factura);
-                // Ahora acepta todos los estados, no solo los que digan 'EDO'
                 if(r.estado && r.estado !== 'S/D') {
                     if(!edoFacturasMap[r.estado]) edoFacturasMap[r.estado] = new Set();
                     if(r.factura && r.factura !== 'S/D') edoFacturasMap[r.estado].add(r.factura);
@@ -310,8 +312,6 @@
             let granTotalFacturas = totalFacturasUnicas.size || 1;
             let edosLabels = Object.keys(edoFacturasMap).sort((a,b) => edoFacturasMap[b].size - edoFacturasMap[a].size).slice(0,6);
             let edosValues = edosLabels.map(e => edoFacturasMap[e].size);
-            
-            // Fórmula idéntica a Excel para mostrar % + Label + Cantidad
             let edosText = edosLabels.map((e, i) => `${(edosValues[i] / granTotalFacturas * 100).toFixed(2)}%<br>${e}: ${edosValues[i]}`);
 
             Plotly.newPlot('chart-estados', [{ 
@@ -416,7 +416,7 @@
                 { x: mesesActuales, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
-            document.getElementById('status').innerText = `Dashboard Analítico Activo y Sincronizado.`;
+            document.getElementById('status').innerText = `Dashboard Analítico Operativo Sincronizado.`;
         }
 
         window.onload = inicializar;
