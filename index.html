@@ -6,21 +6,22 @@
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
-        :root { --primary: #003366; --accent: #27ae60; --danger: #e74c3c; --bg: #e6f0fa; --dark: #2c3e50; }
+        /* Paleta de Colores Corporativa Ajustada */
+        :root { --primary: #A30000; --accent: #808080; --danger: #ED7D31; --bg: #F4F4F4; --dark: #333333; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--dark); }
         .header { background: var(--primary); color: white; padding: 15px 25px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .selector-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; display: flex; gap: 20px; align-items: center; border: 1px solid #c8d6e5; }
+        .selector-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; display: flex; gap: 20px; align-items: center; border: 1px solid #D9D9D9; }
         select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1.1em; color: var(--dark); font-weight: bold; cursor: pointer; }
         .grid-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; border: 1px solid #c8d6e5; }
-        .value { font-size: 2.2em; font-weight: bold; margin: 5px 0; color: #e74c3c; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; border: 1px solid #D9D9D9; }
+        .value { font-size: 2.2em; font-weight: bold; margin: 5px 0; color: var(--primary); }
         .trend { font-size: 1.2em; font-weight: bold; margin-top: 5px; padding: 5px; border-radius: 5px; display: inline-block; width: 100%; box-sizing: border-box; }
         .trend.mejora { color: #27ae60; background: #ebf7ee; border: 1px solid #27ae60; }
         .trend.desmejora { color: var(--danger); background: #fff5f5; border: 1px solid var(--danger); }
         
         .charts-row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
         .charts-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
-        .chart-box { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-height: 380px; border: 1px solid #c8d6e5; border-top: 4px solid #a4b0be; display: flex; flex-direction: column; }
+        .chart-box { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-height: 380px; border: 1px solid #D9D9D9; border-top: 4px solid #808080; display: flex; flex-direction: column; }
         .plotly-graph-div { flex-grow: 1; }
     </style>
 </head>
@@ -28,11 +29,11 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa de Devoluciones y Traslados</h1>
-        <div id="status">Calculando Ventana Móvil de 12 Meses...</div>
+        <div id="status">Sincronizando Dashboard Corporativo...</div>
     </div>
 
     <div class="selector-box">
-        <div id="lbl-anio" style="font-size: 1.1em; font-weight: bold; color: var(--primary); padding: 8px 15px; background: #dff9fb; border-radius: 5px; border: 1px solid #c7ecee;">
+        <div id="lbl-anio" style="font-size: 1.1em; font-weight: bold; color: var(--primary); padding: 8px 15px; background: #f8e6e6; border-radius: 5px; border: 1px solid #f5caca;">
             Periodo: Últimos 12 Meses Registrados
         </div>
         <div>
@@ -73,18 +74,18 @@
 
     <div class="grid-kpis">
         <div class="card">
-            <h3 id="lbl-cajas-A" style="color:#003366; margin:0 0 10px 0; font-size:14px;">Cajas Mes A</h3>
+            <h3 id="lbl-cajas-A" style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">Cajas Mes A</h3>
             <div id="val-cajas-A" class="value">0</div>
         </div>
         <div class="card">
-            <h3 id="lbl-cajas-B" style="color:#003366; margin:0 0 10px 0; font-size:14px;">Cajas Mes B</h3>
+            <h3 id="lbl-cajas-B" style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">Cajas Mes B</h3>
             <div id="val-cajas-B" class="value">0</div>
         </div>
         <div class="card" style="display:flex; align-items:center; justify-content:center;">
             <div id="trend-comparativo" class="trend">--</div>
         </div>
         <div class="card">
-            <h3 style="color:#003366; margin:0 0 10px 0; font-size:14px;">CANTIDAD CAJAS PROCESADAS</h3>
+            <h3 style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">CANTIDAD CAJAS PROCESADAS</h3>
             <div id="total-vol" class="value">0</div>
         </div>
     </div>
@@ -115,7 +116,9 @@
 
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
+        let CURRENT_YEAR = new Date().getFullYear();
         
+        const mesesNumStr = { "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04", "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08", "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12" };
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
         function parsearNumero(val) {
@@ -217,7 +220,7 @@
                     };
                 }).filter(Boolean);
 
-                // FILTRO INTELIGENTE: Mantiene ventana móvil interactiva de 12 meses
+                // FILTRO INTELIGENTE: Ventana móvil
                 BD_DEVOLUCIONES = dataDev.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
                 BD_DESPACHOS = dataDes.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
 
@@ -229,6 +232,15 @@
                 console.error(e);
                 document.getElementById('status').innerText = "Error: Verifica la conexión a GitHub.";
             }
+        }
+
+        function esMesDevolucion(fila, mesTexto) {
+            let numStr = mesesNumStr[mesTexto];
+            let fecha = (fila.fechaFact || '').replace(/-/g, '/');
+            if (fecha.includes('/')) {
+                return fecha.split('/')[1] === numStr;
+            }
+            return false;
         }
 
         function actualizarDashboard() {
@@ -260,18 +272,22 @@
                 trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
             }
 
-            const cBlue = '#4472c4';
-            const cOrange = '#ed7d31';
-            const fontConfig = { size: 9.5, color: '#2c3e50' };
+            // NUEVA PALETA CORPORATIVA
+            const cCorpRed = '#A30000'; 
+            const cCorpGray = '#808080'; 
+            const cCorpLightGray = '#D9D9D9'; 
+            const cCorpBlack = '#000000';
+            const cCorpOrange = '#ED7D31'; 
+
+            const pieColors = [cCorpRed, cCorpGray, '#555555', '#404040', cCorpLightGray, '#1A1A1A'];
+            const fontConfig = { size: 9.5, color: '#333333' };
             
             const layoutBase = { automargin: true, margin: { l: 30, r: 35, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: fontConfig, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.2} };
-            
-            // Auto-Justificación habilitada para Gráficas Horizontales
             const layoutHNoLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 30 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: false };
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
-            // 1. MOTIVOS DE DEVOLUCIÓN (Textos Inclinados y Limpios)
+            // 1. MOTIVOS DE LAS DEVOLUCIONES
             // =======================================================
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
@@ -281,22 +297,22 @@
             let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12));
 
             Plotly.newPlot('chart-motivos', [
-                { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
-                { x: topMotivosWrapped, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} }
+                { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cCorpGray} },
+                { x: topMotivosWrapped, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} }
             ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
 
             // =======================================================
-            // 2. PRODUCTOS DEVUELTOS (Nombres Completos Auto-Ajustados)
+            // 2. PRODUCTOS DEVUELTOS
             // =======================================================
             let prodMap = {};
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
             let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, 6).reverse();
             Plotly.newPlot('chart-productos', [{ 
-                y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', text: topProds.map(p => Math.round(prodMap[p])), textposition: 'outside', cliponaxis: false, marker: {color: cBlue} 
+                y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', text: topProds.map(p => Math.round(prodMap[p])), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} 
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'CAJAS DEVUELTAS X PRODUCTO', font: {size: 11}} }));
 
             // =======================================================
-            // 3. % DEVOLUCIONES POR ESTADO (Exacto a Excel)
+            // 3. % DEVOLUCIONES POR ESTADO
             // =======================================================
             let edoFacturasMap = {};
             let totalFacturasUnicas = new Set();
@@ -315,7 +331,8 @@
             let edosText = edosLabels.map((e, i) => `${(edosValues[i] / granTotalFacturas * 100).toFixed(2)}%<br>${e}: ${edosValues[i]}`);
 
             Plotly.newPlot('chart-estados', [{ 
-                labels: edosLabels, values: edosValues, type: 'pie', text: edosText, textinfo: 'text', textposition: 'outside', textfont: { size: 9 }, hole: 0.3 
+                labels: edosLabels, values: edosValues, type: 'pie', text: edosText, textinfo: 'text', textposition: 'outside', textfont: { size: 9 }, hole: 0.3,
+                marker: { colors: pieColors }
             }], { title: {text: '% DEVOLUCIONES X ESTADO (FACTURAS)', font: {size: 11}}, showlegend: false, margin: { l: 40, r: 40, t: 40, b: 30 } });
 
             // =======================================================
@@ -328,8 +345,8 @@
 
             let respText = topResp.map(re => Math.round(respMap[re]) + ' (' + Math.round((respMap[re]/totalRespCajas)*100) + '%)');
             Plotly.newPlot('chart-responsables', [
-                { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: respText, textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
-                { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% RESPONSABLE', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
+                { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: respText, textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} },
+                { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% RESPONSABLE', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cCorpGray, width: 2}, marker: {color: cCorpBlack, size: 6} }
             ], Object.assign({}, layoutBase, { title: {text: 'TOP 6: RESPONSABLES', font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
             // =======================================================
@@ -339,7 +356,7 @@
             devAmbos.forEach(r => { if(!r.transporte.includes("EDO") && isNaN(r.transporte) && r.transporte !== 'S/D') transMap[r.transporte] = (transMap[r.transporte]||0) + r.cajas; });
             let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, 6).reverse();
             Plotly.newPlot('chart-transporte', [{ 
-                y: topTrans, x: topTrans.map(t => transMap[t]), type: 'bar', orientation: 'h', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} 
+                y: topTrans, x: topTrans.map(t => transMap[t]), type: 'bar', orientation: 'h', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} 
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: TRANSPORTE', font: {size: 11}} }));
 
             // =======================================================
@@ -349,7 +366,7 @@
             devAmbos.forEach(r => { if(!r.chofer.includes("EDO") && isNaN(r.chofer) && r.chofer !== 'S/D') choferMap[r.chofer] = (choferMap[r.chofer]||0) + r.cajas; });
             let topChofer = Object.keys(choferMap).sort((a,b) => choferMap[b] - choferMap[a]).slice(0, 6).reverse();
             Plotly.newPlot('chart-chofer', [{ 
-                y: topChofer, x: topChofer.map(c => choferMap[c]), type: 'bar', orientation: 'h', text: topChofer.map(c => Math.round(choferMap[c])), textposition: 'outside', cliponaxis: false, marker: {color: cOrange} 
+                y: topChofer, x: topChofer.map(c => choferMap[c]), type: 'bar', orientation: 'h', text: topChofer.map(c => Math.round(choferMap[c])), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} 
             }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: CHOFER', font: {size: 11}} }));
 
             // =======================================================
@@ -366,9 +383,9 @@
             let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0,6).reverse();
 
             Plotly.newPlot('chart-faltantes', [
-                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', marker: {color: cOrange} },
-                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', marker: {color: cBlue} }
-            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: FALTANTES (DISP/UND)', font: {size: 11}} }));
+                { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', marker: {color: cCorpGray} },
+                { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', marker: {color: cCorpRed} }
+            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: DEVOLUCIÓN POR FALTANTE (DISP/UND)', font: {size: 11}} }));
 
             // =======================================================
             // 8. FACTURAS DESPACHADAS Vs DEVUELTAS
@@ -384,8 +401,8 @@
             let devText = fDevArr.map((v, i) => v > 0 ? v + ' (' + Math.round(fDevPctArr[i]*100) + '%)' : '');
 
             Plotly.newPlot('chart-facturas', [
-                { x: mesesActuales, y: fDespArr, name: 'Facturas Despachadas', type: 'bar', text: fDespArr.map(v=>v>0?Math.round(v):''), textposition: 'auto', cliponaxis: false, marker: {color: cBlue} },
-                { x: mesesActuales, y: fDevPctArr, name: '% Devueltas', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: devText, textposition: 'top center', cliponaxis: false, line: {color: cOrange, width: 3} }
+                { x: mesesActuales, y: fDespArr, name: 'Facturas Despachadas', type: 'bar', text: fDespArr.map(v=>v>0?Math.round(v):''), textposition: 'auto', cliponaxis: false, marker: {color: cCorpRed} },
+                { x: mesesActuales, y: fDevPctArr, name: '% Devueltas', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: devText, textposition: 'top center', cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
             ], Object.assign({}, layoutBase, { title: {text: 'FACTURAS DESPACHADAS Vs DEVUELTAS', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false } }));
 
             // =======================================================
@@ -399,8 +416,8 @@
             let textCierre = cierreArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round((v/totalCierre[i])*100) + '%)' : '');
 
             Plotly.newPlot('chart-cierre', [
-                { x: mesesActuales, y: normArr, name: 'Venta Normal', type: 'bar', text: textNorm, textposition: 'inside', marker: {color: cBlue} },
-                { x: mesesActuales, y: cierreArr, name: 'Fin de Mes', type: 'bar', text: textCierre, textposition: 'inside', marker: {color: cOrange} }
+                { x: mesesActuales, y: normArr, name: 'Venta Normal', type: 'bar', text: textNorm, textposition: 'inside', marker: {color: cCorpRed} },
+                { x: mesesActuales, y: cierreArr, name: 'Fin de Mes', type: 'bar', text: textCierre, textposition: 'inside', marker: {color: cCorpGray} }
             ], Object.assign({}, layoutBase, { barmode: 'stack', title: {text: 'CAJAS: NORMAL Vs FIN DE MES', font: {size: 11}} }));
 
             // =======================================================
@@ -412,11 +429,11 @@
             let cajasText = cajasMesArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round(pctMesArr[i]*100) + '%)' : '');
 
             Plotly.newPlot('chart-participacion', [
-                { x: mesesActuales, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'outside', cliponaxis: false, marker: {color: cBlue} },
-                { x: mesesActuales, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines', yaxis: 'y2', showlegend: false, line: {color: cOrange, width: 2} }
+                { x: mesesActuales, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} },
+                { x: mesesActuales, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
-            document.getElementById('status').innerText = `Dashboard Analítico Operativo Sincronizado.`;
+            document.getElementById('status').innerText = `Dashboard Corporativo Sincronizado y Aplicado.`;
         }
 
         window.onload = inicializar;
