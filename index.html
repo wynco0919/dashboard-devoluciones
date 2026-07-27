@@ -93,6 +93,16 @@
                 <option value="DICIEMBRE">DICIEMBRE</option>
             </select>
         </div>
+        <!-- NUEVO BOTÓN TOP N DINÁMICO -->
+        <div>
+            <label style="font-weight: bold; margin-right: 8px;">Mostrar:</label>
+            <select id="topN" onchange="actualizarDashboard()">
+                <option value="5" selected>Top 5</option>
+                <option value="6">Top 6</option>
+                <option value="7">Top 7</option>
+                <option value="8">Top 8</option>
+            </select>
+        </div>
     </div>
 
     <div class="grid-kpis">
@@ -243,7 +253,6 @@
                     };
                 }).filter(Boolean);
 
-                // FILTRO INTELIGENTE: Ventana móvil de 12 meses exactos
                 BD_DEVOLUCIONES = dataDev.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
                 BD_DESPACHOS = dataDes.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
 
@@ -269,6 +278,9 @@
         function actualizarDashboard() {
             const mesA = document.getElementById('mesA').value;
             const mesB = document.getElementById('mesB').value;
+            
+            // VALOR DINÁMICO DE TOP N (5, 6, 7 o 8)
+            const topN = parseInt(document.getElementById('topN').value, 10);
 
             document.getElementById('lbl-cajas-A').innerText = mesA;
             document.getElementById('lbl-cajas-B').innerText = mesB;
@@ -277,7 +289,6 @@
             const devB = BD_DEVOLUCIONES.filter(r => r.mesReal === mesB);
             const devAmbos = [...devA, ...devB];
 
-            // 0. KPIs SUPERIORES
             const cajasA = devA.reduce((s, r) => s + r.cajas, 0);
             const cajasB = devB.reduce((s, r) => s + r.cajas, 0);
 
@@ -295,14 +306,13 @@
                 trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
             }
 
-            // PALETA CORPORATIVA WYNCO
             const cCorpRed = '#A30000'; 
             const cCorpGray = '#808080'; 
             const cCorpLightGray = '#D9D9D9'; 
             const cCorpBlack = '#000000';
             const cCorpOrange = '#ED7D31'; 
 
-            const pieColors = [cCorpRed, cCorpGray, '#555555', '#404040', cCorpLightGray, '#1A1A1A'];
+            const pieColors = [cCorpRed, cCorpGray, '#555555', '#404040', cCorpLightGray, '#1A1A1A', '#999999', '#B3B3B3'];
             const fontConfig = { size: 9.5, color: '#333333' };
             
             const layoutBase = { automargin: true, margin: { l: 30, r: 35, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: fontConfig, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.2} };
@@ -315,24 +325,24 @@
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
             devB.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motB[r.motivo] = (motB[r.motivo]||0) + r.cajas; });
-            let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0,6);
+            let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0, topN);
 
             let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12));
 
             Plotly.newPlot('chart-motivos', [
                 { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cCorpGray} },
                 { x: topMotivosWrapped, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} }
-            ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: 'TOP 6: MOTIVOS DE RECHAZO', font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
+            ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: `TOP ${topN}: MOTIVOS DE RECHAZO`, font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
 
             // =======================================================
             // 2. PRODUCTOS DEVUELTOS
             // =======================================================
             let prodMap = {};
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
-            let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, 6).reverse();
+            let topProds = Object.keys(prodMap).sort((a,b) => prodMap[b] - prodMap[a]).slice(0, topN).reverse();
             Plotly.newPlot('chart-productos', [{ 
                 y: topProds, x: topProds.map(p => prodMap[p]), type: 'bar', orientation: 'h', text: topProds.map(p => Math.round(prodMap[p])), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} 
-            }], Object.assign({}, layoutHNoLegend, { title: {text: 'CAJAS DEVUELTAS X PRODUCTO', font: {size: 11}} }));
+            }], Object.assign({}, layoutHNoLegend, { title: {text: `TOP ${topN}: CAJAS DEVUELTAS X PRODUCTO`, font: {size: 11}} }));
 
             // =======================================================
             // 3. % DEVOLUCIONES POR ESTADO
@@ -349,13 +359,13 @@
             });
             
             let granTotalFacturas = totalFacturasUnicas.size || 1;
-            let edosLabels = Object.keys(edoFacturasMap).sort((a,b) => edoFacturasMap[b].size - edoFacturasMap[a].size).slice(0,6);
+            let edosLabels = Object.keys(edoFacturasMap).sort((a,b) => edoFacturasMap[b].size - edoFacturasMap[a].size).slice(0, topN);
             let edosValues = edosLabels.map(e => edoFacturasMap[e].size);
             let edosText = edosLabels.map((e, i) => `${(edosValues[i] / granTotalFacturas * 100).toFixed(2)}%<br>${e}: ${edosValues[i]}`);
 
             Plotly.newPlot('chart-estados', [{ 
                 labels: edosLabels, values: edosValues, type: 'pie', text: edosText, textinfo: 'text', textposition: 'outside', textfont: { size: 9 }, hole: 0.3, marker: { colors: pieColors }
-            }], { title: {text: '% DEVOLUCIONES X ESTADO (FACTURAS)', font: {size: 11}}, showlegend: false, margin: { l: 40, r: 40, t: 40, b: 30 } });
+            }], { title: {text: `% DEVOLUCIONES X ESTADO (TOP ${topN})`, font: {size: 11}}, showlegend: false, margin: { l: 40, r: 40, t: 40, b: 30 } });
 
             // =======================================================
             // 4. RESPONSABLES
@@ -363,33 +373,33 @@
             let respMap = {};
             devAmbos.forEach(r => { if(!r.responsable.includes("EDO") && isNaN(r.responsable) && r.responsable !== 'S/D') respMap[r.responsable] = (respMap[r.responsable]||0) + r.cajas; });
             let totalRespCajas = Object.values(respMap).reduce((s,v)=>s+v,0) || 1;
-            let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0,6);
+            let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0, topN);
 
             let respText = topResp.map(re => Math.round(respMap[re]) + ' (' + Math.round((respMap[re]/totalRespCajas)*100) + '%)');
             Plotly.newPlot('chart-responsables', [
                 { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: respText, textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} },
                 { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% RESPONSABLE', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cCorpGray, width: 2}, marker: {color: cCorpBlack, size: 6} }
-            ], Object.assign({}, layoutBase, { title: {text: 'TOP 6: RESPONSABLES', font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
+            ], Object.assign({}, layoutBase, { title: {text: `TOP ${topN}: RESPONSABLES`, font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
             // =======================================================
             // 5. TRANSPORTE
             // =======================================================
             let transMap = {};
             devAmbos.forEach(r => { if(!r.transporte.includes("EDO") && isNaN(r.transporte) && r.transporte !== 'S/D') transMap[r.transporte] = (transMap[r.transporte]||0) + r.cajas; });
-            let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, 6).reverse();
+            let topTrans = Object.keys(transMap).sort((a,b) => transMap[b] - transMap[a]).slice(0, topN).reverse();
             Plotly.newPlot('chart-transporte', [{ 
                 y: topTrans, x: topTrans.map(t => transMap[t]), type: 'bar', orientation: 'h', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} 
-            }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: TRANSPORTE', font: {size: 11}} }));
+            }], Object.assign({}, layoutHNoLegend, { title: {text: `TOP ${topN}: TRANSPORTE`, font: {size: 11}} }));
 
             // =======================================================
             // 6. CHOFER
             // =======================================================
             let choferMap = {};
             devAmbos.forEach(r => { if(!r.chofer.includes("EDO") && isNaN(r.chofer) && r.chofer !== 'S/D') choferMap[r.chofer] = (choferMap[r.chofer]||0) + r.cajas; });
-            let topChofer = Object.keys(choferMap).sort((a,b) => choferMap[b] - choferMap[a]).slice(0, 6).reverse();
+            let topChofer = Object.keys(choferMap).sort((a,b) => choferMap[b] - choferMap[a]).slice(0, topN).reverse();
             Plotly.newPlot('chart-chofer', [{ 
                 y: topChofer, x: topChofer.map(c => choferMap[c]), type: 'bar', orientation: 'h', text: topChofer.map(c => Math.round(choferMap[c])), textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} 
-            }], Object.assign({}, layoutHNoLegend, { title: {text: 'TOP 6: CHOFER', font: {size: 11}} }));
+            }], Object.assign({}, layoutHNoLegend, { title: {text: `TOP ${topN}: CHOFER`, font: {size: 11}} }));
 
             // =======================================================
             // 7. FALTANTES (DISPLAYS Vs PAQ/UND)
@@ -402,12 +412,12 @@
                     faltMap[r.producto].und += r.und;
                 }
             });
-            let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0,6).reverse();
+            let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0, topN).reverse();
 
             Plotly.newPlot('chart-faltantes', [
                 { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', marker: {color: cCorpGray} },
                 { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', marker: {color: cCorpRed} }
-            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: 'TOP 6: FALTANTES (DISP/UND)', font: {size: 11}} }));
+            ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: `TOP ${topN}: FALTANTES (DISP/UND)`, font: {size: 11}} }));
 
             // =======================================================
             // 8. CRUCE LOGÍSTICO: FACTURAS DESPACHADAS Vs DEVUELTAS
@@ -458,7 +468,6 @@
             document.getElementById('status').innerText = `Dashboard Corporativo Sincronizado, Responsivo y en Tiempo Real.`;
         }
 
-        // MOTOR RESPONSIVO: Recalcula y ajusta el tamaño de todas las gráficas al girar la tablet o redimensionar laptop
         window.addEventListener('resize', function() {
             const chartIds = ['chart-motivos', 'chart-productos', 'chart-estados', 'chart-responsables', 'chart-transporte', 'chart-chofer', 'chart-faltantes', 'chart-facturas', 'chart-cierre', 'chart-participacion'];
             chartIds.forEach(id => {
