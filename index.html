@@ -13,6 +13,9 @@
         
         .header { background: var(--primary); color: white; padding: 15px 25px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
         .header h1 { margin: 0; font-size: 1.5em; }
+        .live-status { background: #800000; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; display: flex; align-items: center; gap: 8px; border: 1px solid #ff4d4d;}
+        .dot { height: 8px; width: 8px; background-color: #2ecc71; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #2ecc71; animation: blink 1.5s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
         
         .selector-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; display: flex; gap: 20px; align-items: center; border: 1px solid #D9D9D9; flex-wrap: wrap; }
         select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1.1em; color: var(--dark); font-weight: bold; cursor: pointer; }
@@ -34,13 +37,8 @@
         .chart-box { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-height: 380px; border: 1px solid #D9D9D9; border-top: 4px solid #808080; display: flex; flex-direction: column; width: 100%; overflow: hidden;}
         .plotly-graph-div { flex-grow: 1; width: 100%; }
 
-        /* Breakpoints para Tablets y Móviles */
-        @media (max-width: 1400px) {
-            .charts-grid.charts-row-4 { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 1100px) {
-            .charts-grid.charts-row-3 { grid-template-columns: repeat(2, 1fr); }
-        }
+        @media (max-width: 1400px) { .charts-grid.charts-row-4 { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 1100px) { .charts-grid.charts-row-3 { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 768px) {
             .charts-grid.charts-row-3, .charts-grid.charts-row-4 { grid-template-columns: 1fr; }
             .header { flex-direction: column; text-align: center; }
@@ -52,7 +50,10 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa y Cruce Logístico</h1>
-        <div id="status">Resolviendo solapamiento de datos...</div>
+        <div class="live-status">
+            <span class="dot"></span>
+            <span id="reloj-actualizacion">Conectando...</span>
+        </div>
     </div>
 
     <div class="selector-box">
@@ -122,7 +123,6 @@
         </div>
     </div>
 
-    <!-- Malla Analítica Adaptativa -->
     <div class="charts-grid charts-row-3">
         <div class="chart-box"><div id="chart-motivos" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-productos" class="plotly-graph-div"></div></div>
@@ -148,8 +148,6 @@
 
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
-        
-        const mesesNumStr = { "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04", "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08", "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12" };
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
         function parsearNumero(val) {
@@ -186,7 +184,12 @@
 
         async function inicializar() {
             try {
-                const [rDes, rDev] = await Promise.all([ fetch(URL_DES).then(r => r.text()), fetch(URL_DEV).then(r => r.text()) ]);
+                // Agregar un cache-buster para asegurar que siempre trae la versión más fresca de GitHub
+                const cacheBuster = `?v=${new Date().getTime()}`;
+                const [rDes, rDev] = await Promise.all([ 
+                    fetch(URL_DES + cacheBuster).then(r => r.text()), 
+                    fetch(URL_DEV + cacheBuster).then(r => r.text()) 
+                ]);
                 
                 let maxYearByMonth = {}; 
 
@@ -256,11 +259,16 @@
 
                 let maxGlobalYear = Math.max(...Object.values(maxYearByMonth));
                 document.getElementById('lbl-anio').innerText = `Año Activo: ${maxGlobalYear} (Ventana Inteligente)`;
+                
+                // Actualizar Reloj
+                const ahora = new Date();
+                const horaStr = ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('reloj-actualizacion').innerText = `En Vivo | Última actualización: ${horaStr}`;
 
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
-                document.getElementById('status').innerText = "Error: Verifica la conexión a GitHub.";
+                document.getElementById('reloj-actualizacion').innerText = "Error de conexión.";
             }
         }
 
@@ -293,13 +301,11 @@
                 trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
             }
 
-            // PALETA CORPORATIVA Y FUENTES
             const cCorpRed = '#A30000'; 
             const cCorpGray = '#808080'; 
             const cCorpLightGray = '#D9D9D9'; 
             const cCorpBlack = '#1A1A1A';
 
-            // FUENTES PURAS Y CLARAS PARA CONTRASTE
             const fontWhite = { color: '#FFFFFF', size: 10, weight: 'bold' };
             const fontDark = { color: '#1A1A1A', size: 10, weight: 'bold' };
             const fontConfig = { size: 9.5, color: '#333333' };
@@ -310,13 +316,12 @@
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
-            // 1. MOTIVOS (Barras Verticales)
+            // 1. MOTIVOS 
             // =======================================================
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
             devB.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motB[r.motivo] = (motB[r.motivo]||0) + r.cajas; });
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0, topN);
-
             let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12));
 
             Plotly.newPlot('chart-motivos', [
@@ -325,7 +330,7 @@
             ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: `TOP ${topN}: MOTIVOS DE RECHAZO`, font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
 
             // =======================================================
-            // 2. PRODUCTOS DEVUELTOS (Horizontales)
+            // 2. PRODUCTOS
             // =======================================================
             let prodMap = {};
             devAmbos.forEach(r => { if(r.producto !== 'S/D') prodMap[r.producto] = (prodMap[r.producto]||0) + r.cajas; });
@@ -335,11 +340,10 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: `TOP ${topN}: CAJAS DEVUELTAS X PRODUCTO`, font: {size: 11}} }));
 
             // =======================================================
-            // 3. % DEVOLUCIONES POR ESTADO
+            // 3. ESTADOS
             // =======================================================
             let edoFacturasMap = {};
             let totalFacturasUnicas = new Set();
-            
             devAmbos.forEach(r => { 
                 if(r.factura && r.factura !== 'S/D') totalFacturasUnicas.add(r.factura);
                 if(r.estado && r.estado !== 'S/D') {
@@ -347,7 +351,6 @@
                     if(r.factura && r.factura !== 'S/D') edoFacturasMap[r.estado].add(r.factura);
                 }
             });
-            
             let granTotalFacturas = totalFacturasUnicas.size || 1;
             let edosLabels = Object.keys(edoFacturasMap).sort((a,b) => edoFacturasMap[b].size - edoFacturasMap[a].size).slice(0, topN);
             let edosValues = edosLabels.map(e => edoFacturasMap[e].size);
@@ -358,7 +361,7 @@
             }], { title: {text: `% DEVOLUCIONES X ESTADO (TOP ${topN})`, font: {size: 11}}, showlegend: false, margin: { l: 40, r: 40, t: 40, b: 30 } });
 
             // =======================================================
-            // 4. RESPONSABLES (BARRAS + LÍNEA)
+            // 4. RESPONSABLES (AJUSTE ESCALA LÍNEA)
             // =======================================================
             let respMap = {};
             devAmbos.forEach(r => { if(!r.responsable.includes("EDO") && isNaN(r.responsable) && r.responsable !== 'S/D') respMap[r.responsable] = (respMap[r.responsable]||0) + r.cajas; });
@@ -366,15 +369,16 @@
             let topResp = Object.keys(respMap).sort((a,b) => respMap[b] - respMap[a]).slice(0, topN);
 
             let respText = topResp.map(re => Math.round((respMap[re]/totalRespCajas)*100) + '%');
-            let maxPctResp = Math.max(...topResp.map(re => respMap[re]/totalRespCajas));
+            let maxCajasResp = Math.max(...topResp.map(re => respMap[re])) || 1;
+            let maxPctResp = Math.max(...topResp.map(re => respMap[re]/totalRespCajas)) || 0.1;
 
             Plotly.newPlot('chart-responsables', [
                 { x: topResp, y: topResp.map(re => respMap[re]), name: 'CANT. CAJAS', type: 'bar', text: topResp.map(re => Math.round(respMap[re])), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} },
                 { x: topResp, y: topResp.map(re => respMap[re]/totalRespCajas), name: '% RESPONSABLE', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: respText, textposition: 'top center', textfont: fontDark, showlegend: false, line: {color: cCorpGray, width: 2}, marker: {color: cCorpBlack, size: 6} }
-            ], Object.assign({}, layoutBase, { title: {text: `TOP ${topN}: RESPONSABLES`, font: {size: 11}}, showlegend: false, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctResp * 1.25] } }));
+            ], Object.assign({}, layoutBase, { title: {text: `TOP ${topN}: RESPONSABLES`, font: {size: 11}}, showlegend: false, yaxis: { range: [0, maxCajasResp * 1.1] }, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctResp * 1.6] } }));
 
             // =======================================================
-            // 5. TRANSPORTE
+            // 5 Y 6. TRANSPORTE Y CHOFER
             // =======================================================
             let transMap = {};
             devAmbos.forEach(r => { if(!r.transporte.includes("EDO") && isNaN(r.transporte) && r.transporte !== 'S/D') transMap[r.transporte] = (transMap[r.transporte]||0) + r.cajas; });
@@ -383,9 +387,6 @@
                 y: topTrans, x: topTrans.map(t => transMap[t]), type: 'bar', orientation: 'h', text: topTrans.map(t => Math.round(transMap[t])), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} 
             }], Object.assign({}, layoutHNoLegend, { title: {text: `TOP ${topN}: TRANSPORTE`, font: {size: 11}} }));
 
-            // =======================================================
-            // 6. CHOFER
-            // =======================================================
             let choferMap = {};
             devAmbos.forEach(r => { if(!r.chofer.includes("EDO") && isNaN(r.chofer) && r.chofer !== 'S/D') choferMap[r.chofer] = (choferMap[r.chofer]||0) + r.cajas; });
             let topChofer = Object.keys(choferMap).sort((a,b) => choferMap[b] - choferMap[a]).slice(0, topN).reverse();
@@ -394,7 +395,7 @@
             }], Object.assign({}, layoutHNoLegend, { title: {text: `TOP ${topN}: CHOFER`, font: {size: 11}} }));
 
             // =======================================================
-            // 7. FALTANTES (DISPLAYS Vs PAQ/UND)
+            // 7. FALTANTES
             // =======================================================
             let faltMap = {};
             devAmbos.forEach(r => { 
@@ -405,19 +406,16 @@
                 }
             });
             let topFalt = Object.keys(faltMap).sort((a,b) => (faltMap[b].disp + faltMap[b].und) - (faltMap[a].disp + faltMap[a].und)).slice(0, topN).reverse();
-
             Plotly.newPlot('chart-faltantes', [
                 { y: topFalt, x: topFalt.map(p => faltMap[p].disp), name: 'Displays', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].disp > 0 ? Math.round(faltMap[p].disp) : ''), textposition: 'inside', textfont: fontWhite, marker: {color: cCorpGray} },
                 { y: topFalt, x: topFalt.map(p => faltMap[p].und), name: 'Paq/Und', type: 'bar', orientation: 'h', text: topFalt.map(p => faltMap[p].und > 0 ? Math.round(faltMap[p].und) : ''), textposition: 'inside', textfont: fontWhite, marker: {color: cCorpRed} }
             ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: `TOP ${topN}: FALTANTES (DISP/UND)`, font: {size: 11}} }));
 
             // =======================================================
-            // 8. CRUCE LOGÍSTICO: FACTURAS DESPACHADAS Vs DEVUELTAS
+            // 8. CRUCE LOGÍSTICO (AJUSTE ESCALA LÍNEA)
             // =======================================================
             let mesesActivos = mesesLista.filter(m => {
-                let hasDespacho = BD_DESPACHOS.some(d => d.mesReal === m && (d.facturasDespachadas > 0 || d.cajasDespachadas > 0));
-                let hasDevolucion = BD_DEVOLUCIONES.some(d => d.mesReal === m && d.cajas > 0);
-                return hasDespacho || hasDevolucion;
+                return BD_DESPACHOS.some(d => d.mesReal === m && (d.facturasDespachadas > 0 || d.cajasDespachadas > 0)) || BD_DEVOLUCIONES.some(d => d.mesReal === m && d.cajas > 0);
             });
             
             let fDespArr = mesesActivos.map(m => { let d = BD_DESPACHOS.find(x => x.mesReal === m); return d ? d.facturasDespachadas : 0; });
@@ -427,12 +425,14 @@
             });
             let fDevPctArr = fDevArr.map((v, i) => fDespArr[i] > 0 ? (v / fDespArr[i]) : 0);
             let devText = fDevArr.map((v, i) => v > 0 ? v + ' (' + Math.round(fDevPctArr[i]*100) + '%)' : '');
-            let maxPctDev = Math.max(...fDevPctArr);
+            
+            let maxDesp = Math.max(...fDespArr) || 1;
+            let maxPctDev = Math.max(...fDevPctArr) || 0.1;
 
             Plotly.newPlot('chart-facturas', [
                 { x: mesesActivos, y: fDespArr, name: 'Despachadas (Ruta)', type: 'bar', text: fDespArr.map(v=>v>0?Math.round(v):''), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} },
                 { x: mesesActivos, y: fDevPctArr, name: '% Rechazadas', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: devText, textposition: 'top center', textfont: fontDark, cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
-            ], Object.assign({}, layoutBase, { title: {text: 'CRUCE LOGÍSTICO: GUÍAS DESPACHADAS Vs RECHAZOS', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false, range: [0, maxPctDev * 1.25] } }));
+            ], Object.assign({}, layoutBase, { title: {text: 'CRUCE LOGÍSTICO: GUÍAS DESPACHADAS Vs RECHAZOS', font: {size: 11}}, yaxis: {range: [0, maxDesp * 1.15]}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false, range: [0, maxPctDev * 1.5] } }));
 
             // =======================================================
             // 9. CAJAS NORMAL Vs FIN DE MES
@@ -450,7 +450,7 @@
             ], Object.assign({}, layoutBase, { barmode: 'stack', title: {text: 'CAJAS: NORMAL Vs FIN DE MES', font: {size: 11}} }));
 
             // =======================================================
-            // 10. CAJAS TOTALES / PARTICIPACION
+            // 10. CAJAS TOTALES (AJUSTE ESCALA LÍNEA)
             // =======================================================
             let totalAnual = BD_DEVOLUCIONES.reduce((s,x)=>s+x.cajas,0) || 1;
             let cajasMesArr = mesesActivos.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m).reduce((s,x)=>s+x.cajas,0));
@@ -458,25 +458,27 @@
             
             let cajasText = cajasMesArr.map(v => v > 0 ? Math.round(v).toLocaleString('es-ES') : '');
             let pctText = pctMesArr.map(v => v > 0 ? (v * 100).toFixed(1) + '%' : '');
-            let maxPctCajas = Math.max(...pctMesArr);
+            
+            let maxCajasMes = Math.max(...cajasMesArr) || 1;
+            let maxPctCajas = Math.max(...pctMesArr) || 0.1;
 
             Plotly.newPlot('chart-participacion', [
                 { x: mesesActivos, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} },
                 { x: mesesActivos, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: pctText, textposition: 'top center', textfont: fontDark, cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
-            ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctCajas * 1.25] } }));
-
-            document.getElementById('status').innerText = `Dashboard Optimizado, Limpio y Sincronizado.`;
+            ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis: {range: [0, maxCajasMes * 1.15]}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctCajas * 1.5] } }));
         }
 
+        // MOTOR RESPONSIVO
         window.addEventListener('resize', function() {
             const chartIds = ['chart-motivos', 'chart-productos', 'chart-estados', 'chart-responsables', 'chart-transporte', 'chart-chofer', 'chart-faltantes', 'chart-facturas', 'chart-cierre', 'chart-participacion'];
             chartIds.forEach(id => {
                 const el = document.getElementById(id);
-                if (el && el.data) {
-                    Plotly.Plots.resize(el);
-                }
+                if (el && el.data) { Plotly.Plots.resize(el); }
             });
         });
+
+        // POLLING: Refresco automático de datos cada 60 segundos
+        setInterval(inicializar, 60000);
 
         window.onload = inicializar;
     </script>
