@@ -52,7 +52,7 @@
 
     <div class="header">
         <h1>Wynco: Inteligencia Operativa y Cruce Logístico</h1>
-        <div id="status">Conectando con Servidor Central...</div>
+        <div id="status">Optimizando gráficas y depurando meses inactivos...</div>
     </div>
 
     <div class="selector-box">
@@ -93,7 +93,6 @@
                 <option value="DICIEMBRE">DICIEMBRE</option>
             </select>
         </div>
-        <!-- NUEVO BOTÓN TOP N DINÁMICO -->
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mostrar:</label>
             <select id="topN" onchange="actualizarDashboard()">
@@ -257,7 +256,7 @@
                 BD_DESPACHOS = dataDes.filter(d => d.mesReal && d.year === maxYearByMonth[d.mesReal]);
 
                 let maxGlobalYear = Math.max(...Object.values(maxYearByMonth));
-                document.getElementById('lbl-anio').innerText = `Año Activo: ${maxGlobalYear} (Ventana 12 Meses)`;
+                document.getElementById('lbl-anio').innerText = `Año Activo: ${maxGlobalYear} (Ventana Inteligente)`;
 
                 actualizarDashboard();
             } catch (e) {
@@ -279,7 +278,6 @@
             const mesA = document.getElementById('mesA').value;
             const mesB = document.getElementById('mesB').value;
             
-            // VALOR DINÁMICO DE TOP N (5, 6, 7 o 8)
             const topN = parseInt(document.getElementById('topN').value, 10);
 
             document.getElementById('lbl-cajas-A').innerText = mesA;
@@ -289,6 +287,7 @@
             const devB = BD_DEVOLUCIONES.filter(r => r.mesReal === mesB);
             const devAmbos = [...devA, ...devB];
 
+            // 0. KPIs SUPERIORES
             const cajasA = devA.reduce((s, r) => s + r.cajas, 0);
             const cajasB = devB.reduce((s, r) => s + r.cajas, 0);
 
@@ -320,7 +319,7 @@
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
-            // 1. MOTIVOS DE LAS DEVOLUCIONES
+            // 1. MOTIVOS
             // =======================================================
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
@@ -422,10 +421,15 @@
             // =======================================================
             // 8. CRUCE LOGÍSTICO: FACTURAS DESPACHADAS Vs DEVUELTAS
             // =======================================================
-            let mesesActuales = mesesLista.filter(m => BD_DESPACHOS.some(d => d.mesReal === m) || BD_DEVOLUCIONES.some(d => d.mesReal === m));
+            // FILTRO INTELIGENTE: Escanea solo los meses que SI tienen actividad (Evita gráficas vacías)
+            let mesesActivos = mesesLista.filter(m => {
+                let hasDespacho = BD_DESPACHOS.some(d => d.mesReal === m && (d.facturasDespachadas > 0 || d.cajasDespachadas > 0));
+                let hasDevolucion = BD_DEVOLUCIONES.some(d => d.mesReal === m && d.cajas > 0);
+                return hasDespacho || hasDevolucion;
+            });
             
-            let fDespArr = mesesActuales.map(m => { let d = BD_DESPACHOS.find(x => x.mesReal === m); return d ? d.facturasDespachadas : 0; });
-            let fDevArr = mesesActuales.map(m => {
+            let fDespArr = mesesActivos.map(m => { let d = BD_DESPACHOS.find(x => x.mesReal === m); return d ? d.facturasDespachadas : 0; });
+            let fDevArr = mesesActivos.map(m => {
                 let devM = BD_DEVOLUCIONES.filter(x => x.mesReal === m);
                 return new Set(devM.map(x => x.factura).filter(x => x && x !== 'S/D')).size;
             });
@@ -433,39 +437,42 @@
             let devText = fDevArr.map((v, i) => v > 0 ? v + ' (' + Math.round(fDevPctArr[i]*100) + '%)' : '');
 
             Plotly.newPlot('chart-facturas', [
-                { x: mesesActuales, y: fDespArr, name: 'Despachadas (Ruta)', type: 'bar', text: fDespArr.map(v=>v>0?Math.round(v):''), textposition: 'auto', cliponaxis: false, marker: {color: cCorpRed} },
-                { x: mesesActuales, y: fDevPctArr, name: '% Rechazadas', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: devText, textposition: 'top center', cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
+                { x: mesesActivos, y: fDespArr, name: 'Despachadas (Ruta)', type: 'bar', text: fDespArr.map(v=>v>0?Math.round(v):''), textposition: 'auto', cliponaxis: false, marker: {color: cCorpRed} },
+                { x: mesesActivos, y: fDevPctArr, name: '% Rechazadas', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: devText, textposition: 'top center', cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
             ], Object.assign({}, layoutBase, { title: {text: 'CRUCE LOGÍSTICO: GUÍAS DESPACHADAS Vs RECHAZOS', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', showgrid: false } }));
 
             // =======================================================
             // 9. CAJAS NORMAL Vs FIN DE MES
             // =======================================================
-            let cierreArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
-            let normArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m && !x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
+            let cierreArr = mesesActivos.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
+            let normArr = mesesActivos.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m && !x.cierre.includes('FIN DE MES')).reduce((s,x)=>s+x.cajas,0));
             let totalCierre = normArr.map((v, i) => v + cierreArr[i]);
 
             let textNorm = normArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round((v/totalCierre[i])*100) + '%)' : '');
             let textCierre = cierreArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round((v/totalCierre[i])*100) + '%)' : '');
 
             Plotly.newPlot('chart-cierre', [
-                { x: mesesActuales, y: normArr, name: 'Venta Normal', type: 'bar', text: textNorm, textposition: 'inside', marker: {color: cCorpRed} },
-                { x: mesesActuales, y: cierreArr, name: 'Fin de Mes', type: 'bar', text: textCierre, textposition: 'inside', marker: {color: cCorpGray} }
+                { x: mesesActivos, y: normArr, name: 'Venta Normal', type: 'bar', text: textNorm, textposition: 'inside', marker: {color: cCorpRed} },
+                { x: mesesActivos, y: cierreArr, name: 'Fin de Mes', type: 'bar', text: textCierre, textposition: 'inside', marker: {color: cCorpGray} }
             ], Object.assign({}, layoutBase, { barmode: 'stack', title: {text: 'CAJAS: NORMAL Vs FIN DE MES', font: {size: 11}} }));
 
             // =======================================================
-            // 10. CAJAS TOTALES / PARTICIPACION
+            // 10. CAJAS TOTALES / PARTICIPACION (Visual Limpia)
             // =======================================================
             let totalAnual = BD_DEVOLUCIONES.reduce((s,x)=>s+x.cajas,0) || 1;
-            let cajasMesArr = mesesActuales.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m).reduce((s,x)=>s+x.cajas,0));
+            let cajasMesArr = mesesActivos.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m).reduce((s,x)=>s+x.cajas,0));
             let pctMesArr = cajasMesArr.map(v => v / totalAnual);
-            let cajasText = cajasMesArr.map((v, i) => v > 0 ? Math.round(v) + '\n(' + Math.round(pctMesArr[i]*100) + '%)' : '');
+            
+            // Separamos la cantidad en la barra y el porcentaje flotando en la línea
+            let cajasText = cajasMesArr.map(v => v > 0 ? Math.round(v).toLocaleString('es-ES') : '');
+            let pctText = pctMesArr.map(v => v > 0 ? (v * 100).toFixed(1) + '%' : '');
 
             Plotly.newPlot('chart-participacion', [
-                { x: mesesActuales, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'outside', cliponaxis: false, marker: {color: cCorpRed} },
-                { x: mesesActuales, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', showlegend: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
+                { x: mesesActivos, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'auto', cliponaxis: false, marker: {color: cCorpRed} },
+                { x: mesesActivos, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: pctText, textposition: 'top center', cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false } }));
 
-            document.getElementById('status').innerText = `Dashboard Corporativo Sincronizado, Responsivo y en Tiempo Real.`;
+            document.getElementById('status').innerText = `Dashboard Optimizado y Sincronizado en Tiempo Real.`;
         }
 
         window.addEventListener('resize', function() {
