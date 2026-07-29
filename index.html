@@ -63,12 +63,12 @@
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mes Base (A):</label>
             <select id="mesA" onchange="actualizarDashboard()">
-                <option value="MAYO">MAYO</option>
-                <option value="JUNIO">JUNIO</option>
                 <option value="ENERO">ENERO</option>
                 <option value="FEBRERO">FEBRERO</option>
                 <option value="MARZO">MARZO</option>
                 <option value="ABRIL">ABRIL</option>
+                <option value="MAYO">MAYO</option>
+                <option value="JUNIO">JUNIO</option>
                 <option value="JULIO">JULIO</option>
                 <option value="AGOSTO">AGOSTO</option>
                 <option value="SEPTIEMBRE">SEPTIEMBRE</option>
@@ -80,12 +80,12 @@
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
             <select id="mesB" onchange="actualizarDashboard()">
-                <option value="JUNIO">JUNIO</option>
-                <option value="MAYO">MAYO</option>
                 <option value="ENERO">ENERO</option>
                 <option value="FEBRERO">FEBRERO</option>
                 <option value="MARZO">MARZO</option>
                 <option value="ABRIL">ABRIL</option>
+                <option value="MAYO">MAYO</option>
+                <option value="JUNIO">JUNIO</option>
                 <option value="JULIO">JULIO</option>
                 <option value="AGOSTO">AGOSTO</option>
                 <option value="SEPTIEMBRE">SEPTIEMBRE</option>
@@ -151,6 +151,9 @@
         let BD_DESPACHOS = [];
         let BD_DEVOLUCIONES = [];
         const mesesLista = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+        
+        let lastDataHash = "";
+        let isFirstLoad = true;
 
         function parsearNumero(val) {
             if (!val) return 0;
@@ -186,12 +189,18 @@
 
         async function inicializar() {
             try {
-                // Agregar un cache-buster para asegurar que siempre trae la versión más fresca de GitHub en vivo
+                // Cache-buster para evitar que el navegador guarde versiones viejas
                 const cacheBuster = `?v=${new Date().getTime()}`;
                 const [rDes, rDev] = await Promise.all([ 
                     fetch(URL_DES + cacheBuster).then(r => r.text()), 
                     fetch(URL_DEV + cacheBuster).then(r => r.text()) 
                 ]);
+                
+                // Sensor de cambios: Si los datos no han cambiado nada, no recargamos los gráficos
+                const currentHash = rDes.length + "|" + rDev.length;
+                if (currentHash === lastDataHash) return; 
+                
+                lastDataHash = currentHash;
                 
                 let maxYearByMonth = {}; 
 
@@ -262,15 +271,23 @@
                 let maxGlobalYear = Math.max(...Object.values(maxYearByMonth));
                 document.getElementById('lbl-anio').innerText = `Año Activo: ${maxGlobalYear} (Ventana Inteligente)`;
                 
-                // Actualizar Reloj
+                // --- INTELIGENCIA DE MES AUTOMÁTICO ---
+                if (isFirstLoad) {
+                    let currentMonthIndex = new Date().getMonth(); // 0 = Enero, 6 = Julio
+                    document.getElementById('mesB').value = mesesLista[currentMonthIndex];
+                    document.getElementById('mesA').value = currentMonthIndex > 0 ? mesesLista[currentMonthIndex - 1] : "DICIEMBRE";
+                    isFirstLoad = false;
+                }
+
+                // El reloj ahora solo cambia la hora cuando efectivamente se cargó un dato nuevo desde el archivo
                 const ahora = new Date();
                 const horaStr = ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-                document.getElementById('reloj-actualizacion').innerText = `En Vivo | Última actualización: ${horaStr}`;
+                document.getElementById('reloj-actualizacion').innerText = `Base actualizada a las: ${horaStr}`;
 
                 actualizarDashboard();
             } catch (e) {
                 console.error(e);
-                document.getElementById('reloj-actualizacion').innerText = "Error de conexión.";
+                document.getElementById('reloj-actualizacion').innerText = "Esperando reconexión...";
             }
         }
 
@@ -318,7 +335,7 @@
             const layoutHLegend = { automargin: true, margin: { l: 20, r: 40, t: 40, b: 40 }, xaxis: { tickfont: fontConfig, cliponaxis: false }, yaxis: { tickfont: {size: 8.5}, automargin: true, cliponaxis: false }, showlegend: true, legend: {orientation: "h", y: -0.3} };
 
             // =======================================================
-            // 1. MOTIVOS 
+            // 1. MOTIVOS
             // =======================================================
             let motA = {}, motB = {};
             devA.forEach(r => { if(isNaN(r.motivo) && r.motivo !== 'S/D') motA[r.motivo] = (motA[r.motivo]||0) + r.cajas; });
@@ -363,7 +380,7 @@
             }], { title: {text: `% DEVOLUCIONES X ESTADO (TOP ${topN})`, font: {size: 11}}, showlegend: false, margin: { l: 40, r: 40, t: 40, b: 30 } });
 
             // =======================================================
-            // 4. RESPONSABLES (AJUSTE ESCALA LÍNEA)
+            // 4. RESPONSABLES
             // =======================================================
             let respMap = {};
             devAmbos.forEach(r => { if(!r.responsable.includes("EDO") && isNaN(r.responsable) && r.responsable !== 'S/D') respMap[r.responsable] = (respMap[r.responsable]||0) + r.cajas; });
@@ -414,7 +431,7 @@
             ], Object.assign({}, layoutHLegend, { barmode: 'stack', title: {text: `TOP ${topN}: FALTANTES (DISP/UND)`, font: {size: 11}} }));
 
             // =======================================================
-            // 8. CRUCE LOGÍSTICO (AJUSTE ESCALA LÍNEA)
+            // 8. CRUCE LOGÍSTICO
             // =======================================================
             let mesesActivos = mesesLista.filter(m => {
                 return BD_DESPACHOS.some(d => d.mesReal === m && (d.facturasDespachadas > 0 || d.cajasDespachadas > 0)) || BD_DEVOLUCIONES.some(d => d.mesReal === m && d.cajas > 0);
@@ -452,7 +469,7 @@
             ], Object.assign({}, layoutBase, { barmode: 'stack', title: {text: 'CAJAS: NORMAL Vs FIN DE MES', font: {size: 11}} }));
 
             // =======================================================
-            // 10. CAJAS TOTALES (AJUSTE ESCALA LÍNEA)
+            // 10. CAJAS TOTALES
             // =======================================================
             let totalAnual = BD_DEVOLUCIONES.reduce((s,x)=>s+x.cajas,0) || 1;
             let cajasMesArr = mesesActivos.map(m => BD_DEVOLUCIONES.filter(x => x.mesReal === m).reduce((s,x)=>s+x.cajas,0));
@@ -470,7 +487,6 @@
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis: {range: [0, maxCajasMes * 1.15]}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctCajas * 1.5] } }));
         }
 
-        // MOTOR RESPONSIVO
         window.addEventListener('resize', function() {
             const chartIds = ['chart-motivos', 'chart-productos', 'chart-estados', 'chart-responsables', 'chart-transporte', 'chart-chofer', 'chart-faltantes', 'chart-facturas', 'chart-cierre', 'chart-participacion'];
             chartIds.forEach(id => {
@@ -479,9 +495,8 @@
             });
         });
 
-        // POLLING: Refresco automático de datos cada 60 segundos
+        // POLLING: Refresco automático solo detecta cambios de longitud en la DB cada 60s
         setInterval(inicializar, 60000);
-
         window.onload = inicializar;
     </script>
 </body>
