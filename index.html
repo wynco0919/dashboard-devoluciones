@@ -21,7 +21,7 @@
         select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1.1em; color: var(--dark); font-weight: bold; cursor: pointer; }
         
         /* Grid dinámico Responsivo */
-        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; border: 1px solid #D9D9D9; display: flex; flex-direction: column; justify-content: center; }
         .value { font-size: 2.2em; font-weight: bold; margin: 5px 0; color: var(--primary); }
         
@@ -39,10 +39,11 @@
 
         @media (max-width: 1400px) { .charts-grid.charts-row-4 { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 1100px) { .charts-grid.charts-row-3 { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .charts-grid.charts-row-3, .charts-grid.charts-row-4 { grid-template-columns: 1fr; }
             .header { flex-direction: column; text-align: center; }
             .selector-box { flex-direction: column; align-items: stretch; text-align: center; }
+            #tasas-container { margin-left: 0 !important; justify-content: center; }
         }
     </style>
 </head>
@@ -56,6 +57,7 @@
         </div>
     </div>
 
+    <!-- BARRA SUPERIOR DE FILTROS Y TASAS DE DEVOLUCIÓN -->
     <div class="selector-box">
         <div id="lbl-anio" style="font-size: 1.1em; font-weight: bold; color: var(--primary); padding: 8px 15px; background: #f8e6e6; border-radius: 5px; border: 1px solid #f5caca;">
             Periodo: Últimos 12 Meses
@@ -80,6 +82,7 @@
         <div>
             <label style="font-weight: bold; margin-right: 8px;">Mes Comparativo (B):</label>
             <select id="mesB" onchange="actualizarDashboard()">
+                <option value="NINGUNO">-- SOLO MES A --</option>
                 <option value="ENERO">ENERO</option>
                 <option value="FEBRERO">FEBRERO</option>
                 <option value="MARZO">MARZO</option>
@@ -105,30 +108,32 @@
                 <option value="10">Top 10</option>
             </select>
         </div>
+        
+        <!-- ETIQUETAS DE INDICADORES EN LA MISMA LÍNEA DEL TOP -->
+        <div id="tasas-container" style="margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap;">
+            <div id="badge-tasa-A" style="background: var(--accent); color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 1.1em; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                % Dev. <span id="lbl-tasa-A">MES</span>: <span id="val-tasa-A">0%</span>
+            </div>
+            <div id="badge-tasa-B" style="background: var(--primary); color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 1.1em; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                % Dev. <span id="lbl-tasa-B">MES</span>: <span id="val-tasa-B">0%</span>
+            </div>
+        </div>
     </div>
 
+    <!-- TARJETAS PRINCIPALES (RESTAURADA A 4 COLUMNAS SIMÉTRICAS) -->
     <div class="grid-kpis">
-        <div class="card">
+        <div class="card" id="card-A">
             <h3 id="lbl-cajas-A" style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">Cajas Mes A</h3>
             <div id="val-cajas-A" class="value">0</div>
         </div>
-        
-        <!-- NUEVA TARJETA: TASA DE DEVOLUCIÓN PARA EL CEO -->
-        <div class="card" style="border-top: 5px solid var(--danger);">
-            <h3 style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">% DEVOLUCIÓN (MES A)</h3>
-            <div id="val-tasa-A" class="value" style="color:var(--danger);">0%</div>
-        </div>
-        
-        <div class="card">
+        <div class="card" id="card-B">
             <h3 id="lbl-cajas-B" style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">Cajas Mes B</h3>
             <div id="val-cajas-B" class="value">0</div>
         </div>
-        
-        <div class="card">
+        <div class="card" id="card-trend">
             <div id="trend-comparativo" class="trend">--</div>
         </div>
-        
-        <div class="card">
+        <div class="card" id="card-total">
             <h3 style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">TOTAL CAJAS PROCESADAS</h3>
             <div id="total-vol" class="value">0</div>
         </div>
@@ -198,19 +203,16 @@
 
         async function inicializar() {
             try {
-                // Cache-buster para evitar que el navegador guarde versiones viejas
                 const cacheBuster = `?v=${new Date().getTime()}`;
                 const [rDes, rDev] = await Promise.all([ 
                     fetch(URL_DES + cacheBuster).then(r => r.text()), 
                     fetch(URL_DEV + cacheBuster).then(r => r.text()) 
                 ]);
                 
-                // Sensor de cambios: Si los datos no han cambiado nada, no recargamos los gráficos
                 const currentHash = rDes.length + "|" + rDev.length;
                 if (currentHash === lastDataHash) return; 
                 
                 lastDataHash = currentHash;
-                
                 let maxYearByMonth = {}; 
 
                 let dataDev = parsearDataPorCoordenadas(rDev).map(r => {
@@ -234,9 +236,7 @@
                     }
 
                     if (mesReal) {
-                        if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) {
-                            maxYearByMonth[mesReal] = year;
-                        }
+                        if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) maxYearByMonth[mesReal] = year;
                     }
 
                     return {
@@ -262,9 +262,7 @@
                     let year = parseInt((r[1] || '2026').trim(), 10);
                     
                     if (mesesLista.includes(mesReal)) {
-                        if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) {
-                            maxYearByMonth[mesReal] = year;
-                        }
+                        if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) maxYearByMonth[mesReal] = year;
                     }
                     return {
                         mesReal: mesReal,
@@ -280,15 +278,13 @@
                 let maxGlobalYear = Math.max(...Object.values(maxYearByMonth));
                 document.getElementById('lbl-anio').innerText = `Año Activo: ${maxGlobalYear} (Ventana Inteligente)`;
                 
-                // --- INTELIGENCIA DE MES AUTOMÁTICO ---
                 if (isFirstLoad) {
-                    let currentMonthIndex = new Date().getMonth(); // 0 = Enero, 6 = Julio
+                    let currentMonthIndex = new Date().getMonth(); 
                     document.getElementById('mesB').value = mesesLista[currentMonthIndex];
                     document.getElementById('mesA').value = currentMonthIndex > 0 ? mesesLista[currentMonthIndex - 1] : "DICIEMBRE";
                     isFirstLoad = false;
                 }
 
-                // El reloj ahora solo cambia la hora cuando efectivamente se cargó un dato nuevo desde el archivo
                 const ahora = new Date();
                 const horaStr = ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
                 document.getElementById('reloj-actualizacion').innerText = `Base actualizada a las: ${horaStr}`;
@@ -302,38 +298,67 @@
 
         function actualizarDashboard() {
             const mesA = document.getElementById('mesA').value;
-            const mesB = document.getElementById('mesB').value;
+            const mesBRaw = document.getElementById('mesB').value;
             const topN = parseInt(document.getElementById('topN').value, 10);
 
+            // LOGICA DE FILTRO ÚNICO: Si escogen el mismo mes o "NINGUNO", apagamos B
+            const isSingleMonth = (mesBRaw === 'NINGUNO' || mesA === mesBRaw);
+            const mesB = isSingleMonth ? mesA : mesBRaw;
+
             document.getElementById('lbl-cajas-A').innerText = mesA;
-            document.getElementById('lbl-cajas-B').innerText = mesB;
 
             const devA = BD_DEVOLUCIONES.filter(r => r.mesReal === mesA);
-            const devB = BD_DEVOLUCIONES.filter(r => r.mesReal === mesB);
+            const devB = isSingleMonth ? [] : BD_DEVOLUCIONES.filter(r => r.mesReal === mesBRaw);
             const devAmbos = [...devA, ...devB];
 
             const cajasA = devA.reduce((s, r) => s + r.cajas, 0);
             const cajasB = devB.reduce((s, r) => s + r.cajas, 0);
 
             document.getElementById('val-cajas-A').innerText = Math.round(cajasA).toLocaleString('es-ES');
-            document.getElementById('val-cajas-B').innerText = Math.round(cajasB).toLocaleString('es-ES');
-            document.getElementById('total-vol').innerText = Math.round(cajasA + cajasB).toLocaleString('es-ES');
-
-            // --- NUEVO CÁLCULO PARA EL CEO: TASA DE DEVOLUCIÓN ---
+            
+            // CÁLCULO DE TASA DE DEVOLUCIÓN MES A
             const despA = BD_DESPACHOS.find(r => r.mesReal === mesA);
             const cajasDespachadasA = despA ? despA.cajasDespachadas : 0;
-            const tasaDevolucion = cajasDespachadasA > 0 ? (cajasA / cajasDespachadasA) * 100 : 0;
-            document.getElementById('val-tasa-A').innerText = tasaDevolucion.toFixed(1) + '%';
-            // -----------------------------------------------------
+            const tasaDevolucionA = cajasDespachadasA > 0 ? (cajasA / cajasDespachadasA) * 100 : 0;
+            
+            document.getElementById('lbl-tasa-A').innerText = mesA;
+            document.getElementById('val-tasa-A').innerText = tasaDevolucionA.toFixed(1) + '%';
+            document.getElementById('badge-tasa-A').style.display = 'block';
 
-            const pctVar = cajasA > 0 ? ((cajasB - cajasA) / cajasA) * 100 : 0;
-            const trend = document.getElementById('trend-comparativo');
-            if (pctVar <= 0) {
-                trend.className = "trend mejora";
-                trend.innerText = `▼ ${Math.abs(pctVar).toFixed(0)}% Mejorando`;
+            if (isSingleMonth) {
+                // MODO: 1 SOLO MES
+                document.getElementById('badge-tasa-B').style.display = 'none';
+                document.getElementById('card-B').style.display = 'none';
+                document.getElementById('card-trend').style.display = 'none';
+                document.getElementById('total-vol').innerText = Math.round(cajasA).toLocaleString('es-ES');
             } else {
-                trend.className = "trend desmejora";
-                trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
+                // MODO: COMPARATIVA
+                document.getElementById('lbl-cajas-B').innerText = mesBRaw;
+                document.getElementById('val-cajas-B').innerText = Math.round(cajasB).toLocaleString('es-ES');
+                
+                const despB = BD_DESPACHOS.find(r => r.mesReal === mesBRaw);
+                const cajasDespachadasB = despB ? despB.cajasDespachadas : 0;
+                const tasaDevolucionB = cajasDespachadasB > 0 ? (cajasB / cajasDespachadasB) * 100 : 0;
+                
+                document.getElementById('lbl-tasa-B').innerText = mesBRaw;
+                document.getElementById('val-tasa-B').innerText = tasaDevolucionB.toFixed(1) + '%';
+                
+                document.getElementById('badge-tasa-B').style.display = 'block';
+                document.getElementById('card-B').style.display = 'flex';
+                document.getElementById('card-trend').style.display = 'flex';
+                
+                document.getElementById('total-vol').innerText = Math.round(cajasA + cajasB).toLocaleString('es-ES');
+
+                // Tendencia (Trend)
+                const pctVar = cajasA > 0 ? ((cajasB - cajasA) / cajasA) * 100 : 0;
+                const trend = document.getElementById('trend-comparativo');
+                if (pctVar <= 0) {
+                    trend.className = "trend mejora";
+                    trend.innerText = `▼ ${Math.abs(pctVar).toFixed(0)}% Mejorando`;
+                } else {
+                    trend.className = "trend desmejora";
+                    trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
+                }
             }
 
             const cCorpRed = '#A30000'; 
@@ -359,10 +384,13 @@
             let topMotivos = [...new Set([...Object.keys(motA), ...Object.keys(motB)])].sort((a,b) => ((motA[b]||0)+(motB[b]||0)) - ((motA[a]||0)+(motB[a]||0))).slice(0, topN);
             let topMotivosWrapped = topMotivos.map(m => wrapText(m, 12));
 
-            Plotly.newPlot('chart-motivos', [
-                { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpGray} },
-                { x: topMotivosWrapped, y: topMotivos.map(m => motB[m]||0), name: mesB.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} }
-            ], Object.assign({}, layoutBase, { barmode: 'group', title: {text: `TOP ${topN}: MOTIVOS DE RECHAZO`, font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
+            let tracesMotivos = [
+                { x: topMotivosWrapped, y: topMotivos.map(m => motA[m]||0), name: mesA.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motA[m]||0)), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpGray} }
+            ];
+            if (!isSingleMonth) {
+                tracesMotivos.push({ x: topMotivosWrapped, y: topMotivos.map(m => motB[m]||0), name: mesBRaw.toLowerCase(), type: 'bar', text: topMotivos.map(m => Math.round(motB[m]||0)), textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} });
+            }
+            Plotly.newPlot('chart-motivos', tracesMotivos, Object.assign({}, layoutBase, { barmode: 'group', title: {text: `TOP ${topN}: MOTIVOS DE RECHAZO`, font: {size: 11}}, margin: { l: 30, r: 35, t: 40, b: 60 }, xaxis: {tickangle: 0, tickfont: {size: 8.5}} }));
 
             // =======================================================
             // 2. PRODUCTOS
@@ -511,7 +539,6 @@
             });
         });
 
-        // POLLING: Refresco automático solo detecta cambios de longitud en la DB cada 60s
         setInterval(inicializar, 60000);
         window.onload = inicializar;
     </script>
