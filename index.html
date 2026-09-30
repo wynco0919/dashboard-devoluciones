@@ -247,12 +247,12 @@
                         cajas: parsearNumero(r[13]),                    
                         disp: parsearNumero(r[14]),  
                         und: parsearNumero(r[15]),                 
-                        chofer: (r[21] || 'S/D').trim().toUpperCase(),  
-                        transporte: (r[22] || 'S/D').trim().toUpperCase(),
-                        motivo: (r[23] || 'OTROS').trim().toUpperCase(), 
-                        responsable: (r[25] || 'S/D').trim().toUpperCase(),
-                        estado: (r[28] || 'S/D').trim().toUpperCase(),  
-                        cierre: (r[34] || 'NORMAL').trim().toUpperCase() 
+                        chofer: (r[20] || 'S/D').trim().toUpperCase(),  
+                        transporte: (r[21] || 'S/D').trim().toUpperCase(),
+                        motivo: (r[22] || 'OTROS').trim().toUpperCase(), 
+                        responsable: (r[24] || 'S/D').trim().toUpperCase(),
+                        estado: (r[27] || 'S/D').trim().toUpperCase(),  
+                        cierre: (r[33] || 'NORMAL').trim().toUpperCase() 
                     };
                 }).filter(Boolean);
 
