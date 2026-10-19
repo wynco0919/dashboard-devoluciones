@@ -21,8 +21,9 @@
         select { padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; font-size: 1.1em; color: var(--dark); font-weight: bold; cursor: pointer; }
         
         /* Grid dinámico Responsivo */
-        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
         .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 5px solid var(--primary); text-align: center; border: 1px solid #D9D9D9; display: flex; flex-direction: column; justify-content: center; }
+        .card-sub { font-size: 0.85em; color: #666; font-weight: bold; margin-top: 3px; }
         .value { font-size: 2.2em; font-weight: bold; margin: 5px 0; color: var(--primary); }
         
         .trend { font-size: 1.2em; font-weight: bold; margin-top: 5px; padding: 5px; border-radius: 5px; display: inline-block; width: 100%; box-sizing: border-box; }
@@ -111,30 +112,40 @@
         
         <!-- ETIQUETAS DE INDICADORES EN LA MISMA LÍNEA DEL TOP -->
         <div id="tasas-container" style="margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap;">
-            <div id="badge-tasa-A" style="background: var(--accent); color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 1.1em; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                % Dev. <span id="lbl-tasa-A">MES</span>: <span id="val-tasa-A">0%</span>
+            <div id="badge-tasa-A" style="background: var(--accent); color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 1.0em; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                % Dev. Cajas <span id="lbl-tasa-A">MES</span>: <span id="val-tasa-A">0%</span>
             </div>
-            <div id="badge-tasa-B" style="background: var(--primary); color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 1.1em; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                % Dev. <span id="lbl-tasa-B">MES</span>: <span id="val-tasa-B">0%</span>
+            <div id="badge-tasa-B" style="background: var(--primary); color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 1.0em; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                % Dev. Cajas <span id="lbl-tasa-B">MES</span>: <span id="val-tasa-B">0%</span>
             </div>
         </div>
     </div>
 
-    <!-- TARJETAS PRINCIPALES (RESTAURADA A 4 COLUMNAS SIMÉTRICAS) -->
+    <!-- TARJETAS PRINCIPALES KPI -->
     <div class="grid-kpis">
         <div class="card" id="card-A">
-            <h3 id="lbl-cajas-A" style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">Cajas Mes A</h3>
+            <h3 id="lbl-cajas-A" style="color:var(--dark); margin:0 0 5px 0; font-size:14px;">Cajas Mes A</h3>
             <div id="val-cajas-A" class="value">0</div>
         </div>
+        
+        <!-- TARJETA: % DEVOLUCIÓN FACTURAS (FIN DE MES) -->
+        <div class="card" id="card-facturas-dev" style="border-top-color: #333333;">
+            <h3 id="lbl-facturas-dev" style="color:var(--dark); margin:0 0 5px 0; font-size:14px;">% Dev. Facturas Fin de Mes</h3>
+            <div id="val-facturas-dev" class="value" style="color: #333333;">0%</div>
+            <div id="sub-facturas-dev" class="card-sub">0 dev (fin de mes) / 0 desp</div>
+        </div>
+
         <div class="card" id="card-B">
-            <h3 id="lbl-cajas-B" style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">Cajas Mes B</h3>
+            <h3 id="lbl-cajas-B" style="color:var(--dark); margin:0 0 5px 0; font-size:14px;">Cajas Mes B</h3>
             <div id="val-cajas-B" class="value">0</div>
         </div>
+        
         <div class="card" id="card-trend">
             <div id="trend-comparativo" class="trend">--</div>
         </div>
+        
         <div class="card" id="card-total">
-            <h3 style="color:var(--dark); margin:0 0 10px 0; font-size:14px;">TOTAL CAJAS PROCESADAS</h3>
+            <h3 style="color:var(--dark); margin:0 0 5px 0; font-size:14px;">TOTAL CAJAS PROCESADAS</h3>
             <div id="total-vol" class="value">0</div>
         </div>
     </div>
@@ -204,10 +215,25 @@
         async function inicializar() {
             try {
                 const cacheBuster = `?v=${new Date().getTime()}`;
-                const [rDes, rDev] = await Promise.all([ 
-                    fetch(URL_DES + cacheBuster).then(r => r.text()), 
-                    fetch(URL_DEV + cacheBuster).then(r => r.text()) 
+                const [respDes, respDev] = await Promise.all([ 
+                    fetch(URL_DES + cacheBuster), 
+                    fetch(URL_DEV + cacheBuster) 
                 ]);
+
+                // EXTRAER FECHA Y HORA REAL DE LA ÚLTIMA CARGA (LAST-MODIFIED EN EL SERVIDOR)
+                const lastModifiedHeader = respDev.headers.get('last-modified') || respDes.headers.get('last-modified');
+                let fechaHoraCargaStr = "";
+                if (lastModifiedHeader) {
+                    const fechaObj = new Date(lastModifiedHeader);
+                    const diaStr = fechaObj.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    const horaStr = fechaObj.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+                    fechaHoraCargaStr = `${diaStr} ${horaStr}`;
+                } else {
+                    const ahora = new Date();
+                    fechaHoraCargaStr = ahora.toLocaleDateString('es-VE') + " " + ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+                }
+
+                const [rDes, rDev] = await Promise.all([ respDes.text(), respDev.text() ]);
                 
                 const currentHash = rDes.length + "|" + rDev.length;
                 if (currentHash === lastDataHash) return; 
@@ -220,10 +246,12 @@
                     let fechaF = (r[6] || '').trim();
                     let year = 2026; 
                     let mesReal = "";
+                    let diaNum = 0;
 
                     if(fechaF.includes('/')) {
                         let partes = fechaF.split('/');
                         if (partes.length >= 3) {
+                            diaNum = parseInt(partes[0], 10) || 0;
                             let mNum = parseInt(partes[1], 10);
                             year = parseInt(partes[2].substring(0, 4), 10);
                             if (!isNaN(mNum) && mNum >= 1 && mNum <= 12) {
@@ -239,10 +267,14 @@
                         if (!maxYearByMonth[mesReal] || year > maxYearByMonth[mesReal]) maxYearByMonth[mesReal] = year;
                     }
 
+                    let cierreVal = (r[33] || '').trim().toUpperCase();
+                    let esFinDeMes = cierreVal.includes('FIN DE MES') || diaNum >= 28;
+
                     return {
                         factura: (r[0] || '').trim().toUpperCase(),
                         mesReal: mesReal, 
                         year: year,
+                        dia: diaNum,
                         producto: (r[10] || 'S/D').trim().toUpperCase(),
                         cajas: parsearNumero(r[13]),                    
                         disp: parsearNumero(r[14]),  
@@ -252,7 +284,8 @@
                         motivo: (r[22] || 'OTROS').trim().toUpperCase(), 
                         responsable: (r[24] || 'S/D').trim().toUpperCase(),
                         estado: (r[27] || 'S/D').trim().toUpperCase(),  
-                        cierre: (r[33] || 'NORMAL').trim().toUpperCase() 
+                        cierre: cierreVal,
+                        esFinDeMes: esFinDeMes
                     };
                 }).filter(Boolean);
 
@@ -285,9 +318,8 @@
                     isFirstLoad = false;
                 }
 
-                const ahora = new Date();
-                const horaStr = ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-                document.getElementById('reloj-actualizacion').innerText = `Base actualizada a las: ${horaStr}`;
+                // MOSTRAR FECHA Y HORA REAL DE LA ÚLTIMA CÁRGA DE ARCHIVOS
+                document.getElementById('reloj-actualizacion').innerText = `Última carga: ${fechaHoraCargaStr}`;
 
                 actualizarDashboard();
             } catch (e) {
@@ -303,9 +335,8 @@
 
             // LOGICA DE FILTRO ÚNICO: Si escogen el mismo mes o "NINGUNO", apagamos B
             const isSingleMonth = (mesBRaw === 'NINGUNO' || mesA === mesBRaw);
-            const mesB = isSingleMonth ? mesA : mesBRaw;
 
-            document.getElementById('lbl-cajas-A').innerText = mesA;
+            document.getElementById('lbl-cajas-A').innerText = `Cajas (${mesA})`;
 
             const devA = BD_DEVOLUCIONES.filter(r => r.mesReal === mesA);
             const devB = isSingleMonth ? [] : BD_DEVOLUCIONES.filter(r => r.mesReal === mesBRaw);
@@ -316,7 +347,7 @@
 
             document.getElementById('val-cajas-A').innerText = Math.round(cajasA).toLocaleString('es-ES');
             
-            // CÁLCULO DE TASA DE DEVOLUCIÓN MES A
+            // CÁLCULO DE TASA DE DEVOLUCIÓN EN CAJAS MES A
             const despA = BD_DESPACHOS.find(r => r.mesReal === mesA);
             const cajasDespachadasA = despA ? despA.cajasDespachadas : 0;
             const tasaDevolucionA = cajasDespachadasA > 0 ? (cajasA / cajasDespachadasA) * 100 : 0;
@@ -324,6 +355,23 @@
             document.getElementById('lbl-tasa-A').innerText = mesA;
             document.getElementById('val-tasa-A').innerText = tasaDevolucionA.toFixed(1) + '%';
             document.getElementById('badge-tasa-A').style.display = 'block';
+
+            // CÁLCULO DE % DEVOLUCIÓN FACTURAS (SOLO FIN DE MES)
+            let devFinDeMes = devAmbos.filter(r => r.esFinDeMes);
+            let facturasDevFinDeMesSet = new Set(devFinDeMes.map(r => r.factura).filter(f => f && f !== 'S/D'));
+            let totalFacturasDevFinDeMes = facturasDevFinDeMesSet.size;
+            
+            let totalFacturasDespachadas = (despA ? despA.facturasDespachadas : 0);
+            if (!isSingleMonth) {
+                const despB = BD_DESPACHOS.find(r => r.mesReal === mesBRaw);
+                totalFacturasDespachadas += (despB ? despB.facturasDespachadas : 0);
+            }
+
+            let pctDevFacturasFinDeMes = totalFacturasDespachadas > 0 ? (totalFacturasDevFinDeMes / totalFacturasDespachadas) * 100 : 0;
+            
+            document.getElementById('lbl-facturas-dev').innerText = isSingleMonth ? `% Dev. Facturas (${mesA})` : `% Dev. Facturas (${mesA} + ${mesBRaw})`;
+            document.getElementById('val-facturas-dev').innerText = Math.round(pctDevFacturasFinDeMes) + '%';
+            document.getElementById('sub-facturas-dev').innerText = `${totalFacturasDevFinDeMes.toLocaleString('es-ES')} rech. fin de mes / ${totalFacturasDespachadas.toLocaleString('es-ES')} desp`;
 
             if (isSingleMonth) {
                 // MODO: 1 SOLO MES
@@ -333,7 +381,7 @@
                 document.getElementById('total-vol').innerText = Math.round(cajasA).toLocaleString('es-ES');
             } else {
                 // MODO: COMPARATIVA
-                document.getElementById('lbl-cajas-B').innerText = mesBRaw;
+                document.getElementById('lbl-cajas-B').innerText = `Cajas (${mesBRaw})`;
                 document.getElementById('val-cajas-B').innerText = Math.round(cajasB).toLocaleString('es-ES');
                 
                 const despB = BD_DESPACHOS.find(r => r.mesReal === mesBRaw);
