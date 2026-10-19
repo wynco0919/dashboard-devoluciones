@@ -129,16 +129,16 @@
             <div id="val-cajas-A" class="value">0</div>
         </div>
         
-        <!-- 2. % DEV FACTURAS MES A -->
+        <!-- 2. % DEV FACTURAS MES A (FIN DE MES) -->
         <div class="card" id="card-facturas-A" style="border-top-color: var(--accent);">
-            <h3 id="lbl-facturas-A" style="color:var(--dark); margin:0 0 5px 0; font-size:14px;">% Dev. Fact. (Mes A)</h3>
+            <h3 id="lbl-facturas-A" style="color:var(--dark); margin:0 0 5px 0; font-size:13px;">% Dev. Fact. Mes A (Fin de Mes)</h3>
             <div id="val-facturas-A" class="value" style="color: var(--accent);">0%</div>
             <div id="sub-facturas-A" class="card-sub">0 rech. / 0 desp</div>
         </div>
 
-        <!-- 3. % DEV FACTURAS MES B -->
+        <!-- 3. % DEV FACTURAS MES B (FIN DE MES) -->
         <div class="card" id="card-facturas-B" style="border-top-color: var(--primary);">
-            <h3 id="lbl-facturas-B" style="color:var(--dark); margin:0 0 5px 0; font-size:14px;">% Dev. Fact. (Mes B)</h3>
+            <h3 id="lbl-facturas-B" style="color:var(--dark); margin:0 0 5px 0; font-size:13px;">% Dev. Fact. Mes B (Fin de Mes)</h3>
             <div id="val-facturas-B" class="value" style="color: var(--primary);">0%</div>
             <div id="sub-facturas-B" class="card-sub">0 rech. / 0 desp</div>
         </div>
@@ -376,7 +376,7 @@
             let facturasDespA = despA ? despA.facturasDespachadas : 0;
             let pctDevA = facturasDespA > 0 ? (facturasDevA / facturasDespA) * 100 : 0;
 
-            document.getElementById('lbl-facturas-A').innerText = `% Dev. Fact. (${mesA})`;
+            document.getElementById('lbl-facturas-A').innerText = `% Dev. Fact. ${mesA} (Fin de Mes)`;
             document.getElementById('val-facturas-A').innerText = Math.round(pctDevA) + '%';
             document.getElementById('sub-facturas-A').innerText = `${facturasDevA.toLocaleString('es-ES')} rech. / ${facturasDespA.toLocaleString('es-ES')} desp`;
 
@@ -389,7 +389,7 @@
             let facturasDespB = despB ? despB.facturasDespachadas : 0;
             let pctDevB = facturasDespB > 0 ? (facturasDevB / facturasDespB) * 100 : 0;
 
-            document.getElementById('lbl-facturas-B').innerText = `% Dev. Fact. (${mesBActual})`;
+            document.getElementById('lbl-facturas-B').innerText = `% Dev. Fact. ${mesBActual} (Fin de Mes)`;
             document.getElementById('val-facturas-B').innerText = Math.round(pctDevB) + '%';
             document.getElementById('sub-facturas-B').innerText = `${facturasDevB.toLocaleString('es-ES')} rech. / ${facturasDespB.toLocaleString('es-ES')} desp`;
 
