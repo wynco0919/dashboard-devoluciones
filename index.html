@@ -32,6 +32,7 @@
         
         /* Malla de Gráficas Responsiva */
         .charts-grid { display: grid; gap: 15px; margin-bottom: 15px; }
+        .charts-row-1 { grid-template-columns: 1fr; }
         .charts-row-3 { grid-template-columns: repeat(3, 1fr); }
         .charts-row-4 { grid-template-columns: repeat(4, 1fr); }
         
@@ -161,12 +162,14 @@
         </div>
     </div>
 
+    <!-- FILA 1 DE GRÁFICAS -->
     <div class="charts-grid charts-row-3">
         <div class="chart-box"><div id="chart-motivos" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-productos" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-estados" class="plotly-graph-div"></div></div>
     </div>
     
+    <!-- FILA 2 DE GRÁFICAS -->
     <div class="charts-grid charts-row-4">
         <div class="chart-box"><div id="chart-responsables" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-transporte" class="plotly-graph-div"></div></div>
@@ -174,10 +177,16 @@
         <div class="chart-box"><div id="chart-faltantes" class="plotly-graph-div"></div></div>
     </div>
     
+    <!-- FILA 3 DE GRÁFICAS -->
     <div class="charts-grid charts-row-3">
         <div class="chart-box"><div id="chart-facturas" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-cierre" class="plotly-graph-div"></div></div>
         <div class="chart-box"><div id="chart-participacion" class="plotly-graph-div"></div></div>
+    </div>
+
+    <!-- FILA 4: GRÁFICA DE FACTURAS A REENVIAR POR MES -->
+    <div class="charts-grid charts-row-1">
+        <div class="chart-box"><div id="chart-reenviadas" class="plotly-graph-div"></div></div>
     </div>
 
     <script>
@@ -281,6 +290,10 @@
                     let cierreVal = (r[33] || '').trim().toUpperCase();
                     let esFinDeMes = cierreVal.includes('FIN DE MES') || diaNum >= 28;
 
+                    // Columna Q (índice 16): si dice "NO", se debe reenviar
+                    let colQ = (r[16] || '').trim().toUpperCase();
+                    let debeReenviar = (colQ === 'NO');
+
                     return {
                         factura: (r[0] || '').trim().toUpperCase(),
                         mesReal: mesReal, 
@@ -289,7 +302,8 @@
                         producto: (r[10] || 'S/D').trim().toUpperCase(),
                         cajas: parsearNumero(r[13]),                    
                         disp: parsearNumero(r[14]),  
-                        und: parsearNumero(r[15]),                 
+                        und: parsearNumero(r[15]),
+                        debeReenviar: debeReenviar,
                         chofer: (r[20] || 'S/D').trim().toUpperCase(),  
                         transporte: (r[21] || 'S/D').trim().toUpperCase(),
                         motivo: (r[22] || 'OTROS').trim().toUpperCase(), 
@@ -329,7 +343,7 @@
                     isFirstLoad = false;
                 }
 
-                // MOSTRAR FECHA Y HORA REAL DE LA ÚLTIMA CÁRGA DE ARCHIVOS
+                // MOSTRAR FECHA Y HORA REAL DE LA ÚLTIMA CARGA DE ARCHIVOS
                 document.getElementById('reloj-actualizacion').innerText = `Última carga: ${fechaHoraCargaStr}`;
 
                 actualizarDashboard();
@@ -596,10 +610,39 @@
                 { x: mesesActivos, y: cajasMesArr, name: 'Cajas Devueltas', type: 'bar', text: cajasText, textposition: 'inside', textfont: fontWhite, cliponaxis: false, marker: {color: cCorpRed} },
                 { x: mesesActivos, y: pctMesArr, name: '% Mensual', type: 'scatter', mode: 'lines+markers+text', yaxis: 'y2', text: pctText, textposition: 'top center', textfont: fontDark, cliponaxis: false, line: {color: cCorpLightGray, width: 3}, marker: {color: cCorpBlack, size: 8} }
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis: {range: [0, maxCajasMes * 1.15]}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctCajas * 1.5] } }));
+
+            // =======================================================
+            // 11. FACTURAS A REENVIAR POR MES (COLUMNA Q = 'NO')
+            // =======================================================
+            let reenviadasMesArr = mesesActivos.map(m => {
+                return BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.debeReenviar).length;
+            });
+            let maxReenviadas = Math.max(...reenviadasMesArr, 1);
+
+            Plotly.newPlot('chart-reenviadas', [{
+                x: mesesActivos,
+                y: reenviadasMesArr,
+                name: 'Facturas a Reenviar',
+                type: 'bar',
+                text: reenviadasMesArr.map(v => v > 0 ? Math.round(v).toLocaleString('es-ES') : ''),
+                textposition: 'inside',
+                textfont: fontWhite,
+                cliponaxis: false,
+                marker: { color: cCorpRed }
+            }], Object.assign({}, layoutBase, {
+                title: { text: 'CANTIDAD DE FACTURAS A REENVIAR POR MES (COLUMNA Q = "NO")', font: { size: 12, weight: 'bold' } },
+                yaxis: { range: [0, maxReenviadas * 1.2], tickfont: fontConfig, cliponaxis: false },
+                showlegend: false
+            }));
         }
 
         window.addEventListener('resize', function() {
-            const chartIds = ['chart-motivos', 'chart-productos', 'chart-estados', 'chart-responsables', 'chart-transporte', 'chart-chofer', 'chart-faltantes', 'chart-facturas', 'chart-cierre', 'chart-participacion'];
+            const chartIds = [
+                'chart-motivos', 'chart-productos', 'chart-estados', 
+                'chart-responsables', 'chart-transporte', 'chart-chofer', 
+                'chart-faltantes', 'chart-facturas', 'chart-cierre', 
+                'chart-participacion', 'chart-reenviadas'
+            ];
             chartIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el && el.data) { Plotly.Plots.resize(el); }
