@@ -529,10 +529,11 @@
                 if (!eventosReenvTarget[edo]) eventosReenvTarget[edo] = new Set();
                 eventosReenvTarget[edo].add(evtKey);
 
-                // Evaluar causa raíz operativa según los criterios requeridos
+                // Evaluar causa raíz operativa agrupada por FACTURA (no por líneas de producto)
                 let categoria = clasificarCausaOperativa(x.observaciones) || clasificarCausaOperativa(x.motivo);
                 if (categoria) {
-                    causasCategorizadas[categoria] = (causasCategorizadas[categoria] || 0) + 1;
+                    if (!causasCategorizadas[categoria]) causasCategorizadas[categoria] = new Set();
+                    causasCategorizadas[categoria].add(evtKey);
                 }
             });
 
@@ -569,18 +570,18 @@
             }
             document.getElementById('insight-reenvios').innerHTML = textoInsightReenvios;
 
-            // Determinar la causa raíz recurrente principal entre las solicitadas
-            let causasSorted = Object.keys(causasCategorizadas).sort((a,b) => causasCategorizadas[b] - causasCategorizadas[a]);
+            // Determinar la causa raíz recurrente principal entre las solicitadas (contando FACTURAS)
+            let causasSorted = Object.keys(causasCategorizadas).sort((a,b) => causasCategorizadas[b].size - causasCategorizadas[a].size);
             let topCausa = causasSorted[0] || null;
-            let cantTopCausa = topCausa ? causasCategorizadas[topCausa] : 0;
+            let cantTopCausa = topCausa ? causasCategorizadas[topCausa].size : 0;
             let textoInsightCausa = "";
 
             if (topCausa) {
-                let totalCausasIdentificadas = Object.values(causasCategorizadas).reduce((s, v) => s + v, 0);
-                let pctCausa = Math.round((cantTopCausa / totalCausasIdentificadas) * 100);
-                textoInsightCausa = `Causa raíz predominante: <strong>"${topCausa}"</strong> con <strong>${cantTopCausa} incidencias</strong> (representa el <strong>${pctCausa}%</strong> de los motivos operativos clave en ${targetMes}). Requiere ajustar los días de despacho acordados con el cliente y verificar horarios comerciales antes de cargar la unidad.`;
+                let totalCausasIdentificadas = Object.values(causasCategorizadas).reduce((s, set) => s + set.size, 0);
+                let pctCausa = totalCausasIdentificadas > 0 ? Math.round((cantTopCausa / totalCausasIdentificadas) * 100) : 0;
+                textoInsightCausa = `Causa raíz predominante: <strong>"${topCausa}"</strong> con <strong>${cantTopCausa} facturas</strong> (representa el <strong>${pctCausa}%</strong> de las facturas con causas operativas clave en ${targetMes}). Requiere ajustar los días de despacho acordados con el cliente y verificar horarios comerciales antes de cargar la unidad.`;
             } else {
-                textoInsightCausa = `No se detectaron incidencias significativas de <em>"Cliente no recibe Fines de Semana"</em>, <em>"Cliente no disponible"</em> o <em>"No dio tiempo de hacer la entrega"</em> para el período evaluado.`;
+                textoInsightCausa = `No se detectaron facturas con motivos de <em>"Cliente no recibe Fines de Semana"</em>, <em>"Cliente no disponible"</em> o <em>"No dio tiempo de hacer la entrega"</em> para el período evaluado.`;
             }
             document.getElementById('insight-observaciones').innerHTML = textoInsightCausa;
 
