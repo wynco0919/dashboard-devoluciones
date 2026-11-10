@@ -30,6 +30,18 @@
         .trend.mejora { color: #27ae60; background: #ebf7ee; border: 1px solid #27ae60; }
         .trend.desmejora { color: var(--danger); background: #fff5f5; border: 1px solid var(--danger); }
         
+        /* Panel Ejecutivo de Diagnóstico */
+        .executive-insights-box { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #D9D9D9; border-left: 6px solid var(--primary); margin-bottom: 15px; }
+        .insights-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .insights-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+        .insights-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; }
+        .insight-item { background: #fdfdfd; padding: 12px 15px; border-radius: 6px; border: 1px solid #e8e8e8; display: flex; align-items: flex-start; gap: 12px; }
+        .insight-item.alerta { border-left: 4px solid var(--danger); }
+        .insight-item.accion { border-left: 4px solid #2980b9; }
+        .insight-icon { font-size: 1.4em; line-height: 1; }
+        .insight-text { font-size: 0.92em; line-height: 1.4; color: var(--dark); }
+        .insight-text strong { color: #111; display: block; margin-bottom: 3px; }
+
         /* Malla de Gráficas Responsiva */
         .charts-grid { display: grid; gap: 15px; margin-bottom: 15px; }
         .charts-row-1 { grid-template-columns: 1fr; }
@@ -162,6 +174,32 @@
         </div>
     </div>
 
+    <!-- PANEL EJECUTIVO DE HALLAZGOS Y DIAGNÓSTICO OPERATIVO (COLUMNA AG) -->
+    <div class="executive-insights-box">
+        <div class="insights-header">
+            <span class="insights-badge">Diagnóstico Ejecutivo</span>
+            <h3 style="margin: 0; font-size: 1.15em; color: var(--dark);" id="lbl-insights-title">
+                Hallazgos Operativos de Reenvíos y Rutas (Columna AG)
+            </h3>
+        </div>
+        <div class="insights-content">
+            <div class="insight-item alerta">
+                <div class="insight-icon">⚠️</div>
+                <div class="insight-text">
+                    <strong>Alerta de Planificación en Rutas:</strong>
+                    <span id="insight-reenvios">Analizando datos...</span>
+                </div>
+            </div>
+            <div class="insight-item accion">
+                <div class="insight-icon">🎯</div>
+                <div class="insight-text">
+                    <strong>Causa Raíz Recurrente (Observaciones):</strong>
+                    <span id="insight-observaciones">Consolidando registros...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- FILA 1 DE GRÁFICAS -->
     <div class="charts-grid charts-row-3">
         <div class="chart-box"><div id="chart-motivos" class="plotly-graph-div"></div></div>
@@ -184,7 +222,7 @@
         <div class="chart-box"><div id="chart-participacion" class="plotly-graph-div"></div></div>
     </div>
 
-    <!-- FILA 4: GRÁFICA DE FACTURAS A REENVIAR POR MES -->
+    <!-- FILA 4: GRÁFICA DE FACTURAS A REENVIAR POR MES CON HOVER ENRIQUECIDO -->
     <div class="charts-grid charts-row-1">
         <div class="chart-box"><div id="chart-reenviadas" class="plotly-graph-div"></div></div>
     </div>
@@ -294,6 +332,9 @@
                     let colQ = (r[16] || '').trim().toUpperCase();
                     let debeReenviar = (colQ === 'NO');
 
+                    // Columna AG (índice 32): Observaciones y comentarios
+                    let observaciones = (r[32] || '').trim();
+
                     return {
                         factura: (r[0] || '').trim().toUpperCase(),
                         mesReal: mesReal, 
@@ -310,7 +351,8 @@
                         responsable: (r[24] || 'S/D').trim().toUpperCase(),
                         estado: (r[27] || 'S/D').trim().toUpperCase(),  
                         cierre: cierreVal,
-                        esFinDeMes: esFinDeMes
+                        esFinDeMes: esFinDeMes,
+                        observaciones: observaciones
                     };
                 }).filter(Boolean);
 
@@ -441,6 +483,75 @@
                     trend.innerText = `▲ ${pctVar.toFixed(0)}% Incremento`;
                 }
             }
+
+            // =======================================================
+            // DIAGNÓSTICO EJECUTIVO Y HALLAZGOS (COLUMNA AG)
+            // =======================================================
+            let targetMes = isSingleMonth ? mesA : mesBActual;
+            let compareMes = isSingleMonth ? null : mesA;
+            document.getElementById('lbl-insights-title').innerText = `Hallazgos Operativos de Reenvíos y Rutas (${isSingleMonth ? targetMes : targetMes + ' vs ' + compareMes})`;
+
+            // Conteo por zona/estado para el mes activo
+            let regReenvTarget = BD_DEVOLUCIONES.filter(x => x.mesReal === targetMes && x.debeReenviar && x.factura && x.factura !== 'S/D');
+            let eventosReenvTarget = {};
+            let obsCounts = {};
+
+            regReenvTarget.forEach(x => {
+                let evtKey = `${x.factura}_${x.dia}`;
+                let edo = (x.estado && x.estado !== 'S/D') ? x.estado : 'OTRAS ZONAS';
+                if (!eventosReenvTarget[edo]) eventosReenvTarget[edo] = new Set();
+                eventosReenvTarget[edo].add(evtKey);
+
+                if (x.observaciones && x.observaciones.length > 2 && x.observaciones !== 'S/D') {
+                    let obsLimpia = x.observaciones.toUpperCase().trim();
+                    obsCounts[obsLimpia] = (obsCounts[obsLimpia] || 0) + 1;
+                }
+            });
+
+            // Encontrar zona con más reenvíos en el mes activo
+            let zonasTargetSorted = Object.keys(eventosReenvTarget).sort((a,b) => eventosReenvTarget[b].size - eventosReenvTarget[a].size);
+            let topZonaTarget = zonasTargetSorted[0] || 'SIN REGISTROS';
+            let cantTopZonaTarget = topZonaTarget !== 'SIN REGISTROS' ? eventosReenvTarget[topZonaTarget].size : 0;
+
+            // Comparación con mes previo si aplica
+            let textoInsightReenvios = "";
+            if (compareMes) {
+                let regReenvComp = BD_DEVOLUCIONES.filter(x => x.mesReal === compareMes && x.debeReenviar && x.factura && x.factura !== 'S/D');
+                let eventosCompMap = {};
+                regReenvComp.forEach(x => {
+                    let edo = (x.estado && x.estado !== 'S/D') ? x.estado : 'OTRAS ZONAS';
+                    if (!eventosCompMap[edo]) eventosCompMap[edo] = new Set();
+                    eventosCompMap[edo].add(`${x.factura}_${x.dia}`);
+                });
+                let cantPrev = eventosCompMap[topZonaTarget] ? eventosCompMap[topZonaTarget].size : 0;
+
+                if (cantTopZonaTarget > cantPrev && cantPrev > 0) {
+                    let pctInc = Math.round(((cantTopZonaTarget - cantPrev) / cantPrev) * 100);
+                    textoInsightReenvios = `Se detecta un incremento del <strong>+${pctInc}%</strong> en casos de reenvío en la zona <strong>${topZonaTarget}</strong> (${cantTopZonaTarget} casos en ${targetMes} vs ${cantPrev} en ${compareMes}). Esto indica posibles desviaciones en la programación de rutas y ventanas de entrega. Se sugiere auditar la secuencia de despacho de cada unidad.`;
+                } else if (cantTopZonaTarget > cantPrev && cantPrev === 0) {
+                    textoInsightReenvios = `Se detecta una concentración crítica de reenvíos en la zona <strong>${topZonaTarget}</strong> con <strong>${cantTopZonaTarget} casos</strong> en ${targetMes}. Indica desajustes en la cobertura de ruta; se debe analizar cada caso con Tráfico.`;
+                } else if (cantTopZonaTarget < cantPrev) {
+                    let pctBaj = Math.round(((cantPrev - cantTopZonaTarget) / cantPrev) * 100);
+                    textoInsightReenvios = `Favorable reducción del <strong>-${pctBaj}%</strong> de reenvíos en <strong>${topZonaTarget}</strong> frente a ${compareMes} (${cantTopZonaTarget} vs ${cantPrev} casos), reflejando mayor efectividad en la entrega de ruta.`;
+                } else {
+                    textoInsightReenvios = `La zona <strong>${topZonaTarget}</strong> lidera los reenvíos con <strong>${cantTopZonaTarget} facturas</strong> en ${targetMes}. Se recomienda revisar con logística la distribución de carga y choferes asignados.`;
+                }
+            } else {
+                textoInsightReenvios = `Concentración de reenvíos focalizada en <strong>${topZonaTarget}</strong> con <strong>${cantTopZonaTarget} facturas</strong> en ${targetMes}. Se recomienda auditar la asignación de transporte para optimizar los tiempos de llegada.`;
+            }
+            document.getElementById('insight-reenvios').innerHTML = textoInsightReenvios;
+
+            // Observación más recurrente
+            let topObsSorted = Object.keys(obsCounts).sort((a,b) => obsCounts[b] - obsCounts[a]);
+            let topObs = topObsSorted[0] || 'SIN OBSERVACIONES RECURRENTES';
+            let cantTopObs = obsCounts[topObs] || 0;
+            let textoInsightObs = "";
+            if (cantTopObs > 0) {
+                textoInsightObs = `Comentario más frecuente en columna AG: <em>"${topObs}"</em> (registrado en <strong>${cantTopObs} líneas</strong> de ${targetMes}). Corresponde a la principal causa raíz de reintento de despacho.`;
+            } else {
+                textoInsightObs = `No se detectaron notas recurrentes cargadas en la columna AG para el período seleccionado.`;
+            }
+            document.getElementById('insight-observaciones').innerHTML = textoInsightObs;
 
             const cCorpRed = '#A30000'; 
             const cCorpGray = '#808080'; 
@@ -612,12 +723,43 @@
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis: {range: [0, maxCajasMes * 1.15]}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctCajas * 1.5] } }));
 
             // =======================================================
-            // 11. FACTURAS A REENVIAR POR MES (OPCIÓN 2: FACTURA + DÍA)
+            // 11. FACTURAS A REENVIAR POR MES CON HOVER ENRIQUECIDO
             // =======================================================
+            let hoverTextReenvArr = [];
             let reenviadasMesArr = mesesActivos.map(m => {
                 let registrosMes = BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.debeReenviar && x.factura && x.factura !== 'S/D');
+                
                 let eventosReenvio = new Set(registrosMes.map(x => `${x.factura}_${x.dia}`));
-                return eventosReenvio.size;
+                let totalEvts = eventosReenvio.size;
+
+                // Conteo de eventos de reenvío por zona en el mes m
+                let zMap = {};
+                let obsM = {};
+                registrosMes.forEach(x => {
+                    let edo = (x.estado && x.estado !== 'S/D') ? x.estado : 'OTRAS ZONAS';
+                    let evtKey = `${x.factura}_${x.dia}`;
+                    if (!zMap[edo]) zMap[edo] = new Set();
+                    zMap[edo].add(evtKey);
+
+                    if (x.observaciones && x.observaciones.length > 2 && x.observaciones !== 'S/D') {
+                        let oL = x.observaciones.toUpperCase().trim();
+                        obsM[oL] = (obsM[oL] || 0) + 1;
+                    }
+                });
+
+                let topZSorted = Object.keys(zMap).sort((a,b) => zMap[b].size - zMap[a].size);
+                let bestZ = topZSorted[0] || 'S/D';
+                let bestZCount = bestZ !== 'S/D' ? zMap[bestZ].size : 0;
+
+                let topObsM = Object.keys(obsM).sort((a,b) => obsM[b] - obsM[a])[0] || 'SIN OBSERVACIONES';
+
+                let hText = `<b>${m}</b><br>` +
+                            `• Total Reenvíos: <b>${totalEvts}</b> facturas<br>` +
+                            `• Zona Crítica: <b>${bestZ}</b> (${bestZCount} casos)<br>` +
+                            `• Causa frecuente: <i>${topObsM.substring(0, 35)}...</i>`;
+                hoverTextReenvArr.push(hText);
+
+                return totalEvts;
             });
             let maxReenviadas = Math.max(...reenviadasMesArr, 1);
 
@@ -629,6 +771,8 @@
                 text: reenviadasMesArr.map(v => v > 0 ? Math.round(v).toLocaleString('es-ES') : ''),
                 textposition: 'inside',
                 textfont: fontWhite,
+                hovertext: hoverTextReenvArr,
+                hoverinfo: 'text',
                 cliponaxis: false,
                 marker: { color: cCorpRed }
             }], Object.assign({}, layoutBase, {
