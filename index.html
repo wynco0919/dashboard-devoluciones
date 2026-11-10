@@ -612,10 +612,12 @@
             ], Object.assign({}, layoutBase, { title: {text: 'CAJAS DEVUELTAS / TOTAL GENERAL', font: {size: 11}}, yaxis: {range: [0, maxCajasMes * 1.15]}, yaxis2: { overlaying: 'y', side: 'right', showticklabels: false, showgrid: false, range: [0, maxPctCajas * 1.5] } }));
 
             // =======================================================
-            // 11. FACTURAS A REENVIAR POR MES (COLUMNA Q = 'NO')
+            // 11. FACTURAS A REENVIAR POR MES (OPCIÓN 2: FACTURA + DÍA)
             // =======================================================
             let reenviadasMesArr = mesesActivos.map(m => {
-                return BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.debeReenviar).length;
+                let registrosMes = BD_DEVOLUCIONES.filter(x => x.mesReal === m && x.debeReenviar && x.factura && x.factura !== 'S/D');
+                let eventosReenvio = new Set(registrosMes.map(x => `${x.factura}_${x.dia}`));
+                return eventosReenvio.size;
             });
             let maxReenviadas = Math.max(...reenviadasMesArr, 1);
 
